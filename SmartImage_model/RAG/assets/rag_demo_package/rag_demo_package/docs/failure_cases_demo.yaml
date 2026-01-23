@@ -1,0 +1,92 @@
+dataset_id: FAILURE_CASES_DEMO_001
+title: 匿名化失败案例库（Synthetic Demo）
+doc_type: failure_case
+version: demo_v1
+effective_date: '2025-12-20'
+access_level: r&d
+anonymization: no_phi
+notes: 本文件为合成示例（非真实病例），用于演示标签化与检索；案例要点参考公开资料中对“遗漏风险、QA、复核”的原则性描述。
+source_uri:
+- https://www.rcr.ac.uk/media/bpvngu2n/rcr-publications_radiotherapy-target-volume-definition-and-peer-review-second-edition-rcr-guidance_october-2022.pdf
+items:
+- case_id: FC_HN_SYN_0001
+  scenario: 边界对比度低（靠近软组织界面）导致自动勾画外溢
+  symptom: GTV在某一侧外溢约2-3mm，影响邻近结构
+  likely_causes:
+  - 边界灰度差异小
+  - 配准/窗口设置不佳
+  - 模型泛化不足
+  recommended_checks:
+  - 多平面查看外溢区域
+  - 对照诊断影像并评估配准
+  - 将外溢处作为优先编辑点
+  severity: medium
+  tags:
+  - head_neck
+  - 外溢
+  - 低对比度
+  model_version: demo_unetpp_v0
+- case_id: FC_HN_SYN_0002
+  scenario: GTV遗漏导致后续CTV/PTV连锁扩大仍未覆盖复发高风险区
+  symptom: 审阅时发现可疑结节未被纳入GTV
+  likely_causes:
+  - 影像未充分查看（未滚动全序列）
+  - 仅依赖自动勾画
+  - 诊断影像未参考
+  recommended_checks:
+  - 复核所有计划CT切片并对照诊断影像
+  - 按流程记录修订原因
+  - 必要时提交同行评审讨论
+  severity: high
+  tags:
+  - head_neck
+  - 遗漏
+  - QA
+  - peer_review
+  model_version: demo_sam_v0
+- case_id: FC_HN_SYN_0003
+  scenario: CTV按“各向同性扩展”后未按解剖屏障编辑
+  symptom: CTV包含不合理解剖结构（例如明显不可能浸润的骨性结构）
+  likely_causes:
+  - 扩展后未逐层编辑
+  - 缺少共识协议/图谱参考
+  recommended_checks:
+  - 扩展后逐层检查并按解剖屏障编辑
+  - 引用院内/公开协议减少变异
+  severity: medium
+  tags:
+  - CTV
+  - 解剖屏障
+  - 编辑
+  model_version: n/a
+- case_id: FC_HN_SYN_0004
+  scenario: PTV margin 未按部门审计数据更新
+  symptom: 发现PTV margin 与现行摆位策略不一致
+  likely_causes:
+  - 设备/固定方式更新后未重新审计
+  - 沿用旧协议
+  recommended_checks:
+  - 核对部门最新margin策略与摆位验证方法
+  - 在计划说明中记录依据
+  severity: medium
+  tags:
+  - PTV
+  - margin
+  - 审计
+  model_version: n/a
+- case_id: FC_HN_SYN_0005
+  scenario: OAR未完整勾画导致计划优化偏差
+  symptom: 计划后评估发现关键OAR缺失或命名不规范
+  likely_causes:
+  - 模板不一致
+  - 自动OAR未复核
+  recommended_checks:
+  - 按命名规范补全OAR/必要时建立PRV
+  - 与影像科/物理师协作复核关键结构
+  severity: high
+  tags:
+  - OAR
+  - 命名
+  - 复核
+  - PRV
+  model_version: demo_autoseg_v0

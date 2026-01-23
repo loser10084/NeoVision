@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FAQItem",
+  "type": "object",
+  "required": [
+    "qa_id",
+    "question",
+    "answer",
+    "access_level",
+    "last_updated"
+  ],
+  "properties": {
+    "qa_id": {
+      "type": "string"
+    },
+    "role": {
+      "type": "string"
+    },
+    "trigger": {
+      "type": "string"
+    },
+    "question": {
+      "type": "string"
+    },
+    "answer": {
+      "type": "string"
+    },
+    "tags": {
+      "type": [
+        "string",
+        "array"
+      ]
+    },
+    "access_level": {
+      "type": "string"
+    },
+    "doc_refs": {
+      "type": [
+        "string",
+        "array"
+      ]
+    },
+    "last_updated": {
+      "type": "string"
+    }
+  }
+}

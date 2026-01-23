@@ -1,0 +1,125 @@
+﻿{
+  "pages": [
+    {
+      "path": "pages/auth/login",
+      "style": {
+        "navigationBarTitleText": "智影登录",
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTextStyle": "black"
+      }
+    },
+    {
+      "path": "pages/auth/register",
+      "style": {
+        "navigationBarTitleText": "注册账户",
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTextStyle": "black"
+      }
+    },
+    {
+      "path": "pages/patient/list",
+      "style": {
+        "navigationBarTitleText": "患者列表",
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTextStyle": "black",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/patient/add",
+      "style": {
+        "navigationBarTitleText": "新增患者",
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTextStyle": "black"
+      }
+    },
+    {
+      "path": "pages/agent/chat",
+      "style": {
+        "navigationBarTitleText": "智能体",
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTextStyle": "black"
+      }
+    },
+    {
+      "path": "pages/agent/conversation",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "智能体对话",
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTextStyle": "black"
+      }
+    },
+    {
+      "path": "pages/patient/mine",
+      "style": {
+        "navigationBarTitleText": "我的",
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTextStyle": "black"
+      }
+    },
+    {
+      "path": "pages/patient/detail",
+      "style": {
+        "navigationBarTitleText": "患者详情",
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTextStyle": "black"
+      }
+    },
+    {
+      "path": "pages/patient/edit",
+      "style": {
+        "navigationBarTitleText": "编辑患者",
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTextStyle": "black"
+      }
+    },
+    {
+      "path": "pages/model/viewer",
+      "style": {
+        "navigationBarTitleText": "3D 模型",
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTextStyle": "black"
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "智影",
+    "navigationBarBackgroundColor": "#ffffff",
+    "backgroundColor": "#ffffff"
+  },
+  "tabBar": {
+    "color": "#7a7e85",
+    "selectedColor": "#0f1012",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/patient/list",
+        "text": "患者",
+        "iconPath": "static/tab-patient.png",
+        "selectedIconPath": "static/tab-patient-active.png"
+      },
+      {
+        "pagePath": "pages/agent/chat",
+        "text": "智能体",
+        "iconPath": "static/tab-agent.png",
+        "selectedIconPath": "static/tab-agent-active.png"
+      },
+      {
+        "pagePath": "pages/patient/mine",
+        "text": "我的",
+        "iconPath": "static/tab-mine.png",
+        "selectedIconPath": "static/tab-mine-active.png"
+      }
+    ]
+  },
+  "easycom": {
+    "autoscan": true,
+    "custom": {
+      "^wd-(.*)": "uni_modules/wot-design-uni/components/wd-$1/wd-$1.vue"
+    }
+  },
+  "uniIdRouter": {}
+}

@@ -1,0 +1,70 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Env / secrets
+.env
+.env.*
+*.pem
+*.key
+
+# Logs
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Node / frontend
+node_modules/
+dist/
+build/
+.next/
+out/
+coverage/
+
+# ML artifacts / data
+*.mha
+*.npy
+*.npz
+*.pt
+*.pth
+*.onnx
+*.h5
+*.ckpt
+*.pkl
+data/
+datasets/
+models/
+outputs/
+runs/
+
+# Archives
+*.zip
+*.7z
+*.rar
+
+# Root docs / assets (keep code only)
+/3d参考.md
+/3D实现.md
+/FrontendIntegrationNotes.txt
+/redis配置.txt
+/report.md
+/技术实现.md
+/项目介绍.docx
+/项目介绍.txt
+/前端提示词.md
+/后端提示词.md
+/api_endpoints.txt
+/sample_data.sql
+/schema.sql
+/wot-design-uni组件资源.md
+/project_icon.jpg
+/brats_2013_pat0001_1_Flair.mha
+/brats_2013_pat0001_1_label.mha
+/neoVison.zip

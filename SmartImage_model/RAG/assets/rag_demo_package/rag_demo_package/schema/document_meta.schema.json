@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DocumentMeta",
+  "type": "object",
+  "required": [
+    "doc_id",
+    "title",
+    "doc_type",
+    "version",
+    "effective_date",
+    "access_level",
+    "language"
+  ],
+  "properties": {
+    "doc_id": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "doc_type": {
+      "type": "string"
+    },
+    "disease_site": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    },
+    "effective_date": {
+      "type": "string"
+    },
+    "publisher": {
+      "type": "string"
+    },
+    "owner": {
+      "type": "string"
+    },
+    "reviewer": {
+      "type": "string"
+    },
+    "source_uri": {
+      "type": [
+        "array",
+        "string"
+      ]
+    },
+    "copyright": {
+      "type": "string"
+    },
+    "access_level": {
+      "type": "string"
+    },
+    "language": {
+      "type": "string"
+    },
+    "tags": {
+      "type": [
+        "array",
+        "string"
+      ]
+    },
+    "summary": {
+      "type": "string"
+    }
+  }
+}
