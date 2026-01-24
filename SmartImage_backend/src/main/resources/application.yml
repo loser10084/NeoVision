@@ -34,7 +34,7 @@ logging:
         controller: info
 
 alioss:
-    access-key-id: LTAI5tQ5Ly2rLjt3wjAFew1a
-    access-key-secret: oE0SnUDQmHQD97yyZC964QmreibOvr
+    access-key-id: LTAI5tQR1DCR4xsdN3E4ySJ8
+    access-key-secret: BLtkCVoUl2Pmpn8x17PBa6kigdYkYb
     endpoint: oss-cn-hangzhou.aliyuncs.com
     bucket-name: smart-image-1
