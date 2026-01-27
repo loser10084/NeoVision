@@ -1,0 +1,47 @@
+dataset_id: FAQ_DEMO_001
+title: RAG Demo FAQ 数据集（头颈放疗相关）
+doc_type: faq
+version: demo_v1
+effective_date: '2025-12-20'
+publisher: Demo (compiled)
+access_level: doctor
+source_uri:
+- https://www.rcr.ac.uk/media/bpvngu2n/rcr-publications_radiotherapy-target-volume-definition-and-peer-review-second-edition-rcr-guidance_october-2022.pdf
+- https://seer.cancer.gov/seertools/glossary/view/5532f75ae4b0e16303c8fb8e/
+items:
+- qa_id: FAQ_HN_00001
+  role: doctor
+  trigger: 初稿返回后复核
+  question: GTV、CTV、PTV有什么区别？
+  answer: GTV是可见/可证实的肿瘤范围；CTV在GTV基础上加入需要覆盖的亚临床/微小病灶风险；PTV用于考虑摆位/几何误差等不确定性，在CTV/ITV基础上加margin以保证处方覆盖。
+  tags: GTV,CTV,PTV,概念
+  access_level: doctor
+  doc_refs: RCR2022(GTV/CTV/PTV章节); SEER(CTV术语)
+  last_updated: '2025-12-20'
+- qa_id: FAQ_HN_00002
+  role: doctor
+  trigger: 使用自动勾画/分割后
+  question: 自动勾画出来的轮廓可以直接用于治疗吗？
+  answer: 不建议直接使用。自动分割/自动勾画需要逐结构、逐病例核对并在必要时编辑；对边界不清、可变形结构尤其要谨慎，并将复核过程纳入质量保证流程。
+  tags: 自动勾画,QA,复核
+  access_level: doctor
+  doc_refs: RCR2022(autosegmentation需QA与逐结构验证)
+  last_updated: '2025-12-20'
+- qa_id: FAQ_HN_00003
+  role: qc
+  trigger: 同行评审会议
+  question: 同行评审的结果如何记录才可审计？
+  answer: 建议使用标准化的同行评审结果模板记录（如NO CHANGE/MINOR/MAJOR），并注明使用的指南/协议、讨论用时、记录人、日期等，以便后续审计和质量改进。
+  tags: peer review,审计,模板
+  access_level: qc
+  doc_refs: RCR2022(标准化peer review outcome record建议)
+  last_updated: '2025-12-20'
+- qa_id: FAQ_SYS_00001
+  role: doctor
+  trigger: 系统使用
+  question: 看到低置信度区域时我应该怎么处理？
+  answer: 把低置信度区域当作“优先复核提示”：切换多平面查看边界，结合临床信息与影像对照；必要时进行局部编辑/精修。最终以医生判断与科室流程为准。
+  tags: 置信度,复核,多平面
+  access_level: doctor
+  doc_refs: RCR2022(强调避免遗漏、QA与复核); Demo(产品逻辑)
+  last_updated: '2025-12-20'

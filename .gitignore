@@ -48,22 +48,23 @@ runs/
 *.zip
 *.7z
 *.rar
+.git1/
 
 # Root docs / assets (keep code only)
-/3d²Î¿¼.md
-/3DÊµÏÖ.md
+/3dï¿½Î¿ï¿½.md
+/3DÊµï¿½ï¿½.md
 /FrontendIntegrationNotes.txt
-/redisÅäÖÃ.txt
+/redisï¿½ï¿½ï¿½ï¿½.txt
 /report.md
-/¼¼ÊõÊµÏÖ.md
-/ÏîÄ¿½éÉÜ.docx
-/ÏîÄ¿½éÉÜ.txt
-/Ç°¶ËÌáÊ¾´Ê.md
-/ºó¶ËÌáÊ¾´Ê.md
+/ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½.md
+/ï¿½ï¿½Ä¿ï¿½ï¿½ï¿½ï¿½.docx
+/ï¿½ï¿½Ä¿ï¿½ï¿½ï¿½ï¿½.txt
+/Ç°ï¿½ï¿½ï¿½ï¿½Ê¾ï¿½ï¿½.md
+/ï¿½ï¿½ï¿½ï¿½ï¿½Ê¾ï¿½ï¿½.md
 /api_endpoints.txt
 /sample_data.sql
 /schema.sql
-/wot-design-uni×é¼ş×ÊÔ´.md
+/wot-design-uniï¿½ï¿½ï¿½ï¿½ï¿½Ô´.md
 /project_icon.jpg
 /brats_2013_pat0001_1_Flair.mha
 /brats_2013_pat0001_1_label.mha
