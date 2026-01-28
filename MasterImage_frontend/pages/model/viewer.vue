@@ -5,7 +5,7 @@
         <view class="section-title">3D Reconstruction</view>
         <view class="action-grid">
           <wd-button shape="round" type="default" plain class="action-btn" @click="loadSample" :loading="loading">
-            Load sample MHA
+            Load sample NRRD
           </wd-button>
           <wd-button
             shape="round"
@@ -17,8 +17,8 @@
           >
             Load from study
           </wd-button>
-          <wd-button shape="round" type="default" plain class="action-btn" @click="pickMha" :disabled="loading">
-            Pick MHA
+          <wd-button shape="round" type="default" plain class="action-btn" @click="pickNrrd" :disabled="loading">
+            Pick NRRD
           </wd-button>
         </view>
         <view class="tips">
@@ -112,15 +112,26 @@
 import { getModel } from '../../common/api'
 import { BASE_URL } from '../../common/request'
 
-const ELEMENT_TYPES = {
-  MET_SHORT: { bytes: 2, ctor: Int16Array },
-  MET_USHORT: { bytes: 2, ctor: Uint16Array },
-  MET_INT: { bytes: 4, ctor: Int32Array },
-  MET_FLOAT: { bytes: 4, ctor: Float32Array }
+const NRRD_TYPES = {
+  'uchar': { bytes: 1, ctor: Uint8Array },
+  'unsigned char': { bytes: 1, ctor: Uint8Array },
+  'uint8': { bytes: 1, ctor: Uint8Array },
+  'int8': { bytes: 1, ctor: Int8Array },
+  'short': { bytes: 2, ctor: Int16Array },
+  'short int': { bytes: 2, ctor: Int16Array },
+  'int16': { bytes: 2, ctor: Int16Array },
+  'ushort': { bytes: 2, ctor: Uint16Array },
+  'unsigned short': { bytes: 2, ctor: Uint16Array },
+  'uint16': { bytes: 2, ctor: Uint16Array },
+  'int': { bytes: 4, ctor: Int32Array },
+  'int32': { bytes: 4, ctor: Int32Array },
+  'uint': { bytes: 4, ctor: Uint32Array },
+  'uint32': { bytes: 4, ctor: Uint32Array },
+  'float': { bytes: 4, ctor: Float32Array },
+  'double': { bytes: 8, ctor: Float64Array }
 }
 
-const DEFAULT_FLAIR = '/static/brats_2013_pat0001_1_Flair.mha'
-const DEFAULT_LABEL = '/static/brats_2013_pat0001_1_label.mha'
+const DEFAULT_NRRD = '/static/VSD.Brain.XX.O.MR_Flair.54193_1.nrrd'
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value))
@@ -240,29 +251,7 @@ const mat4 = {
   }
 }
 
-function findSequence(bytes, needle) {
-  for (let i = 0; i <= bytes.length - needle.length; i += 1) {
-    let match = true
-    for (let j = 0; j < needle.length; j += 1) {
-      if (bytes[i + j] !== needle[j]) {
-        match = false
-        break
-      }
-    }
-    if (match) return i
-  }
-  return -1
-}
-
-function findHeaderEnd(bytes) {
-  const marker = new TextEncoder().encode('ElementDataFile')
-  const markerIndex = findSequence(bytes, marker)
-  if (markerIndex >= 0) {
-    for (let i = markerIndex; i < bytes.length; i += 1) {
-      if (bytes[i] === 10) return i + 1
-      if (bytes[i] === 13 && bytes[i + 1] === 10) return i + 2
-    }
-  }
+function findNrrdHeaderEnd(bytes) {
   for (let i = 0; i < bytes.length - 1; i += 1) {
     if (bytes[i] === 10 && bytes[i + 1] === 10) return i + 2
     if (i < bytes.length - 3 && bytes[i] === 13 && bytes[i + 1] === 10 && bytes[i + 2] === 13 && bytes[i + 3] === 10) {
@@ -272,19 +261,40 @@ function findHeaderEnd(bytes) {
   return -1
 }
 
-function parseHeader(text) {
+function parseNrrdHeader(text) {
   const header = {}
   const lines = text.split(/\r?\n/)
-  lines.forEach((line) => {
+  lines.forEach((line, index) => {
     const trimmed = line.trim()
     if (!trimmed || trimmed.startsWith('#')) return
-    const parts = trimmed.split('=')
-    if (parts.length < 2) return
-    const key = parts[0].trim()
-    const value = parts.slice(1).join('=').trim()
+    if (index === 0 && trimmed.startsWith('NRRD')) {
+      header._magic = trimmed
+      return
+    }
+    const sep = trimmed.indexOf(':')
+    if (sep < 0) return
+    const key = trimmed.slice(0, sep).trim().toLowerCase()
+    const value = trimmed.slice(sep + 1).trim()
     header[key] = value
   })
   return header
+}
+
+function isLittleEndianSystem() {
+  return new Uint8Array(new Uint16Array([1]).buffer)[0] === 1
+}
+
+function swapBytesInPlace(bytes, bytesPerElement, elementCount) {
+  for (let i = 0; i < elementCount; i += 1) {
+    const offset = i * bytesPerElement
+    for (let j = 0; j < bytesPerElement / 2; j += 1) {
+      const a = offset + j
+      const b = offset + bytesPerElement - 1 - j
+      const tmp = bytes[a]
+      bytes[a] = bytes[b]
+      bytes[b] = tmp
+    }
+  }
 }
 
 const LENGTH_BASE = [
@@ -572,7 +582,7 @@ export default {
       }
     },
     resolveModelUrl() {
-      const candidates = ['mhaUrl', 'mhaPath', 'modelPath', 'filePath', 'url']
+      const candidates = ['nrrdUrl', 'nrrdPath', 'modelPath', 'filePath', 'url', 'mhaUrl', 'mhaPath']
       const raw = candidates.map((key) => this.modelInfo?.[key]).find(Boolean)
       if (!raw) return ''
       if (/^https?:\/\//i.test(raw)) return raw
@@ -858,13 +868,13 @@ void main() {
       this.requestRender()
     },
     async loadSample() {
-      await this.loadMhaPair(DEFAULT_FLAIR, DEFAULT_LABEL, 'BraTS 2013 (Flair + Label)')
+      await this.loadNrrdFromUrl(DEFAULT_NRRD, 'Sample NRRD')
     },
     async loadFromModel() {
       if (!this.modelUrl) return
-      await this.loadMhaFromUrl(this.modelUrl, 'Study MHA')
+      await this.loadNrrdFromUrl(this.modelUrl, 'Study NRRD')
     },
-    async pickMha() {
+    async pickNrrd() {
       if (!this.isH5) {
         uni.showToast({ title: 'Use H5 to pick file', icon: 'none' })
         return
@@ -882,34 +892,34 @@ void main() {
           if (!file) return
           if (file.file && file.file.arrayBuffer) {
             const buffer = await file.file.arrayBuffer()
-            await this.loadMhaFromBuffer(buffer, file.name || 'Picked MHA')
+            await this.loadNrrdFromBuffer(buffer, file.name || 'Picked NRRD')
             return
           }
           if (file.path) {
-            await this.loadMhaFromUrl(file.path, file.name || 'Picked MHA')
+            await this.loadNrrdFromUrl(file.path, file.name || 'Picked NRRD')
           }
         }
       })
     },
-    async loadMhaFromUrl(url, label) {
+    async loadNrrdFromUrl(url, label) {
       if (!this.isH5) return
       try {
         this.loading = true
         const targetUrl = this.normalizeUrl(url)
-        this.setStatus(`Loading MHA... (${targetUrl})`)
+        this.setStatus(`Loading NRRD... (${targetUrl})`)
         const buffer = await this.fetchArrayBuffer(targetUrl)
-        await this.loadMhaFromBuffer(buffer, label)
+        await this.loadNrrdFromBuffer(buffer, label)
         this.sourceLabel = label
       } catch (err) {
-        console.error('loadMhaFromUrl failed', { url, err })
+        console.error('loadNrrdFromUrl failed', { url, err })
         this.setStatus(`Load failed: ${err.message || err}`)
       } finally {
         this.loading = false
       }
     },
-    async loadMhaFromBuffer(buffer, label) {
+    async loadNrrdFromBuffer(buffer, label) {
       try {
-        const volume = await this.parseMhaBuffer(buffer)
+        const volume = await this.parseNrrdBuffer(buffer)
         const { values, dims, min, max } = volume
         this.volume = volume
         this.labelVolume = null
@@ -923,31 +933,31 @@ void main() {
         this.sourceLabel = label
         this.setStatus('Render ready')
       } catch (err) {
-        console.error('loadMhaFromBuffer failed', { label, err })
+        console.error('loadNrrdFromBuffer failed', { label, err })
         this.setStatus(`Parse failed: ${err.message || err}`)
       }
     },
-    async loadMhaPair(flairUrl, labelUrl, label) {
+    async loadNrrdPair(flairUrl, labelUrl, label) {
       if (!this.isH5) return
       try {
         this.loading = true
         const flairTarget = this.normalizeUrl(flairUrl)
         const labelTarget = this.normalizeUrl(labelUrl)
-        this.setStatus(`Loading MHA... (${flairTarget})`)
+        this.setStatus(`Loading NRRD... (${flairTarget})`)
         const [flairBuffer, labelBuffer] = await Promise.all([
           this.fetchArrayBuffer(flairTarget),
           this.fetchArrayBuffer(labelTarget)
         ])
-        this.setStatus('Parsing Flair MHA...')
-        const flairVolume = await this.parseMhaBuffer(flairBuffer)
-        this.setStatus('Parsing Label MHA...')
-        const labelVolume = await this.parseMhaBuffer(labelBuffer)
+        this.setStatus('Parsing Flair NRRD...')
+        const flairVolume = await this.parseNrrdBuffer(flairBuffer)
+        this.setStatus('Parsing Label NRRD...')
+        const labelVolume = await this.parseNrrdBuffer(labelBuffer)
         if (
           flairVolume.dims.length < 3 ||
           labelVolume.dims.length < 3 ||
           flairVolume.dims.some((v, i) => v !== labelVolume.dims[i])
         ) {
-          this.setStatus('Label MHA dims mismatch, showing Flair only')
+          this.setStatus('Label NRRD dims mismatch, showing Flair only')
           this.labelVolume = null
         } else {
           this.labelVolume = labelVolume
@@ -963,7 +973,7 @@ void main() {
         this.sourceLabel = label
         this.setStatus('Render ready')
       } catch (err) {
-        console.error('loadMhaPair failed', { flairUrl, labelUrl, err })
+        console.error('loadNrrdPair failed', { flairUrl, labelUrl, err })
         this.setStatus(`Load failed: ${err.message || err}`)
       } finally {
         this.loading = false
@@ -988,41 +998,79 @@ void main() {
         return response.arrayBuffer()
       }
     },
-    async parseMhaBuffer(buffer) {
-      this.setStatus('Parsing MHA header...')
+    async parseNrrdBuffer(buffer) {
+      this.setStatus('Parsing NRRD header...')
       const bytes = new Uint8Array(buffer)
-      const headerEnd = findHeaderEnd(bytes)
+      const headerEnd = findNrrdHeaderEnd(bytes)
       if (headerEnd < 0) {
         throw new Error('Header not found')
       }
       const headerText = new TextDecoder('utf-8').decode(bytes.slice(0, headerEnd))
-      const header = parseHeader(headerText)
-      const dims = (header.DimSize || '').split(/\s+/).map((v) => Number(v))
+      const header = parseNrrdHeader(headerText)
+      if (!header._magic || !header._magic.startsWith('NRRD')) {
+        throw new Error('Invalid NRRD magic')
+      }
+      const dims = (header.sizes || '').split(/\s+/).map((v) => Number(v))
       if (dims.length < 3 || dims.some((v) => Number.isNaN(v))) {
-        throw new Error('Invalid DimSize')
+        throw new Error('Invalid sizes')
       }
-      const elementType = header.ElementType
-      const elementInfo = ELEMENT_TYPES[elementType]
+      const elementType = String(header.type || '').toLowerCase()
+      const elementInfo = NRRD_TYPES[elementType]
       if (!elementInfo) {
-        throw new Error(`Unsupported ElementType: ${elementType}`)
+        throw new Error(`Unsupported NRRD type: ${elementType}`)
       }
-      const compressed = String(header.CompressedData || '').toLowerCase() === 'true'
+      const dataFile = header['data file'] || header.datafile || ''
+      if (dataFile && dataFile.toLowerCase() !== 'local') {
+        throw new Error('Detached NRRD data is not supported')
+      }
+      const encoding = String(header.encoding || 'raw').toLowerCase()
+      const isAscii = encoding === 'ascii' || encoding === 'txt' || encoding === 'text'
       let payload = bytes.slice(headerEnd)
-      if (compressed) {
-        this.setStatus('Decompressing MHA payload...')
+      if (!isAscii && (encoding === 'gzip' || encoding === 'gz' || encoding === 'deflate')) {
+        this.setStatus('Decompressing NRRD payload...')
         payload = await this.decompress(payload)
+      } else if (!isAscii && encoding !== 'raw') {
+        throw new Error(`Unsupported NRRD encoding: ${encoding}`)
       }
       const expectedVoxels = dims[0] * dims[1] * dims[2]
+      if (isAscii) {
+        const text = new TextDecoder('utf-8').decode(payload)
+        const tokens = text.trim().split(/\s+/)
+        if (tokens.length < expectedVoxels) {
+          throw new Error(`Payload length mismatch: ${tokens.length} < ${expectedVoxels}`)
+        }
+        const typed = new elementInfo.ctor(expectedVoxels)
+        for (let i = 0; i < expectedVoxels; i += 1) {
+          typed[i] = Number(tokens[i])
+        }
+        const values = typed
+        let min = Number.POSITIVE_INFINITY
+        let max = Number.NEGATIVE_INFINITY
+        for (let i = 0; i < values.length; i += 1) {
+          const v = values[i]
+          if (v < min) min = v
+          if (v > max) max = v
+        }
+        return { values, dims, min, max }
+      }
       const expectedBytes = expectedVoxels * elementInfo.bytes
       if (payload.byteLength < expectedBytes) {
         throw new Error(`Payload length mismatch: ${payload.byteLength} < ${expectedBytes}`)
       }
+      const endian = String(header.endian || 'little').toLowerCase()
+      const littleEndian = isLittleEndianSystem()
+      let payloadView = payload.slice(0, expectedBytes)
+      if (elementInfo.bytes > 1 && endian === 'big' && littleEndian) {
+        swapBytesInPlace(payloadView, elementInfo.bytes, expectedVoxels)
+      } else if (elementInfo.bytes > 1 && endian === 'little' && !littleEndian) {
+        swapBytesInPlace(payloadView, elementInfo.bytes, expectedVoxels)
+      }
       const typed = new elementInfo.ctor(
-        payload.buffer,
-        payload.byteOffset,
-        Math.floor(payload.byteLength / elementInfo.bytes)
+        payloadView.buffer,
+        payloadView.byteOffset,
+        expectedVoxels
       )
-      const values = typed.slice(0, expectedVoxels)
+      const values = typed
       let min = Number.POSITIVE_INFINITY
       let max = Number.NEGATIVE_INFINITY
       for (let i = 0; i < values.length; i += 1) {
