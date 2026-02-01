@@ -1,4 +1,4 @@
-import { request, requestModel, setAuth, clearAuth, MODEL_BASE_URL, getToken } from './request'
+import { request, requestModel, setAuth, clearAuth, resolveModelUrl, getToken } from './request'
 
 // 认证
 export function login(payload) {
@@ -54,9 +54,25 @@ export function updateStudy(id, studyId, payload) {
   return request({ url: `/api/patients/${id}/studies/${studyId}`, method: 'PUT', data: payload })
 }
 
+export function deleteStudy(id, studyId) {
+  return request({ url: `/api/patients/${id}/studies/${studyId}`, method: 'DELETE' })
+}
+
 // 直传返回 fileId/filePath（如需）
 export function uploadStudyFile(id, studyId, payload) {
   return request({ url: `/api/patients/${id}/studies/${studyId}/upload`, method: 'POST', data: payload })
+}
+
+export function downloadStudyVolume(studyId) {
+  return request({ url: `/api/studies/${studyId}/download/volume`, method: 'GET' })
+}
+
+export function downloadStudyLabel(studyId) {
+  return request({ url: `/api/studies/${studyId}/download/label`, method: 'GET' })
+}
+
+export function segmentStudyMultimodal(studyId, payload) {
+  return request({ url: `/api/studies/${studyId}/segment/multimodal`, method: 'POST', data: payload })
 }
 
 // AI 结果/靶区
@@ -76,13 +92,30 @@ export function downloadContour(id, contourId) {
   return request({ url: `/api/patients/${id}/contours/${contourId}/download`, method: 'GET' })
 }
 
+export function upsertContour(id, payload) {
+  return request({ url: `/api/patients/${id}/contours/upsert`, method: 'POST', data: payload })
+}
+
 // 文件与 3D 模型
 export function getFile(fileId) {
   return request({ url: `/api/files/${fileId}`, method: 'GET' })
 }
 
+export function deleteFile(fileId) {
+  return request({ url: `/api/files/${fileId}`, method: 'DELETE' })
+}
+
 export function getModel(studyId) {
   return request({ url: `/api/studies/${studyId}/model`, method: 'GET' })
+}
+
+export function submitCtvExpand(payload) {
+  return requestModel({
+    url: '/api/ctv/expand',
+    method: 'POST',
+    data: payload,
+    showError: false
+  })
 }
 
 // 智能体交互
@@ -95,7 +128,7 @@ export function sendAgentMessageWithImage(prompt, imagePath) {
   return new Promise((resolve, reject) => {
     const token = getToken()
     uni.uploadFile({
-      url: `${MODEL_BASE_URL}/api/agent/chat`,
+      url: resolveModelUrl('/api/agent/chat'),
       filePath: imagePath,
       name: 'image',
       formData: { prompt: prompt || '' },
@@ -140,12 +173,19 @@ export default {
   getStudiesByPatient,
   createStudy,
   updateStudy,
+  deleteStudy,
   uploadStudyFile,
+  downloadStudyVolume,
+  downloadStudyLabel,
+  segmentStudyMultimodal,
   getContours,
   updateContourStatus,
   downloadContour,
+  upsertContour,
   getFile,
+  deleteFile,
   getModel,
+  submitCtvExpand,
   sendAgentMessage,
   sendAgentMessageWithImage,
   getAgentHistory

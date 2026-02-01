@@ -24,6 +24,27 @@ load_dotenv(BASE_DIR / ".env")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "")
 
+# Segmentation model settings
+SEG_MODEL_DIR = os.getenv("SEG_MODEL_DIR", "")
+SEG_WEIGHTS_PATH = os.getenv("SEG_WEIGHTS_PATH", "")
+SEG_DEVICE = os.getenv("SEG_DEVICE", "cpu")
+SEG_LABEL_CLASS = int(os.getenv("SEG_LABEL_CLASS", "1"))
+SEG_MODALITY_DIR = os.getenv("SEG_MODALITY_DIR", "")
+
+# CTV refine/expand model settings
+CTV_MODEL_DIR = os.getenv("CTV_MODEL_DIR", "")
+CTV_PYTHON = os.getenv("CTV_PYTHON", "")
+CTV_REFINE_SCRIPT = os.getenv("CTV_REFINE_SCRIPT", "")
+CTV_EXPAND_SCRIPT = os.getenv("CTV_EXPAND_SCRIPT", "")
+CTV_UNET_CKPT = os.getenv("CTV_UNET_CKPT", "")
+CTV_REFINE_CKPT = os.getenv("CTV_REFINE_CKPT", "")
+CTV_DEVICE = os.getenv("CTV_DEVICE", "")
+CTV_EXPANSION_MM = float(os.getenv("CTV_EXPANSION_MM", "1"))
+CTV_SPACING_MM = os.getenv("CTV_SPACING_MM", "")
+CTV_CONF_SCRIPT = os.getenv("CTV_CONF_SCRIPT", "")
+CTV_CONF_SLICE_INDEX = int(os.getenv("CTV_CONF_SLICE_INDEX", "80"))
+CTV_CONF_NORMALIZE = os.getenv("CTV_CONF_NORMALIZE", "true").lower() == "true"
+
 # 模型名称定义
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")           # 默认文本模型
 IMAGE_MODEL_NAME = os.getenv("IMAGE_MODEL_NAME", "gpt-5-mini") # 图像处理模型

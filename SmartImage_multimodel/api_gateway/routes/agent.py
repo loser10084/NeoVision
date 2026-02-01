@@ -158,14 +158,6 @@ def agent_chat_stream():
     if isinstance(payload, list):
         provided_messages = llm.build_messages(payload)
 
-    class _QueueCallbackHandler(BaseCallbackHandler):
-        def __init__(self, queue: Queue):
-            self.queue = queue
-
-        def on_llm_new_token(self, token: str, **kwargs) -> None:
-            if token:
-                self.queue.put(token)
-
     def generate():
         # if image_url:
         #     logger.critical(f"收到图片流式请求: {image_url}")
@@ -193,7 +185,6 @@ def agent_chat_stream():
             yield "data: [DONE]\n\n"
             return
         token_queue: Queue = Queue()
-        handler = _QueueCallbackHandler(token_queue)
         output_holder = {"text": "", "error": None}
 
 
@@ -245,11 +236,34 @@ def agent_chat_stream():
                     emit(str(content))
                 handle_tool_calls(msg)
 
+            saw_token = False
+
             def parse_event(event):
                 """解析LangGraph事件结构（防止 node_data 是 str）"""
                 if not isinstance(event, dict):
                     return
 
+                # 1) 处理 GraphExecutor.stream 的 token 事件
+                token = event.get("token")
+                if token:
+                    nonlocal saw_token
+                    saw_token = True
+                    emit(str(token))
+                    return
+
+                # 2) 处理顶层 output（某些图会直接返回）
+                output = event.get("output")
+                if output and not saw_token:
+                    emit(str(output))
+
+                # 3) 处理顶层 messages（某些图会直接返回）
+                top_messages = event.get("messages")
+                if isinstance(top_messages, list) and not saw_token:
+                    for msg in top_messages:
+                        if msg.__class__.__name__ == "AIMessage":
+                            handle_ai_message(msg)
+
+                # 4) 处理节点级 messages
                 for node_data in event.values():
                     # 必须先判断类型
                     if not isinstance(node_data, dict):
@@ -259,6 +273,8 @@ def agent_chat_stream():
                     if not isinstance(messages, list):
                         continue
 
+                    if saw_token:
+                        continue
                     for msg in messages:
                         if msg.__class__.__name__ == "AIMessage":
                             handle_ai_message(msg)
@@ -273,14 +289,22 @@ def agent_chat_stream():
                         
                         
                         for event in executor.stream(
-                            {"input": query, "image_url": image_url},
-                            config={"callbacks": [handler]}
+                            {"input": query, "image_url": image_url}
                         ):
                             parse_event(event)
                                                         
 
 
                         final_text = "".join(full_response).strip()
+                        if not final_text:
+                            # 流式未产出内容时，回退一次常规调用以拿到最终输出
+                            result = executor.invoke(
+                                {"input": query, "image_url": image_url}
+                            )
+                            output = result.get("output", "") if isinstance(result, dict) else str(result)
+                            if output:
+                                emit(str(output))
+                            final_text = "".join(full_response).strip() or str(output).strip()
                         output_holder["text"] = final_text
                         
                         # 保存历史记录
@@ -304,7 +328,7 @@ def agent_chat_stream():
                         if "Redis" in str(stream_exc) or "RDB" in str(stream_exc) or "snapshot" in str(stream_exc).lower():
                             logger.warning("检测到Redis配置问题，直接使用常规处理")
                             # 直接使用常规处理，避免重复尝试
-                            result = executor.invoke({"input": query, "image_url": image_url}, config={"callbacks": [handler]})
+                            result = executor.invoke({"input": query, "image_url": image_url})
                             output = result.get("output", "") if isinstance(result, dict) else str(result)
                             output_holder["text"] = output
                             if output.strip():
@@ -315,7 +339,7 @@ def agent_chat_stream():
                         else:
                             # 对于其他类型的错误，尝试回退到常规处理
                             try:
-                                result = executor.invoke({"input": query, "image_url": image_url}, config={"callbacks": [handler]})
+                                result = executor.invoke({"input": query, "image_url": image_url})
                                 output = result.get("output", "") if isinstance(result, dict) else str(result)
                                 output_holder["text"] = output
                                 if output.strip():
@@ -329,7 +353,7 @@ def agent_chat_stream():
                 else:
                     # 使用常规处理
                     logger.info(f"使用常规处理执行查询: {query}")
-                    result = executor.invoke({"input": query, "image_url": image_url}, config={"callbacks": [handler]})
+                    result = executor.invoke({"input": query, "image_url": image_url})
                     output = result.get("output", "") if isinstance(result, dict) else str(result)
                     output_holder["text"] = output
                     if output.strip():

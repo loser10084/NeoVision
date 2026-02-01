@@ -3,24 +3,6 @@
     <view class="safe-area">
       <view class="card">
         <view class="section-title">3D Reconstruction</view>
-        <view class="action-grid">
-          <wd-button shape="round" type="default" plain class="action-btn" @click="loadSample" :loading="loading">
-            Load sample NRRD
-          </wd-button>
-          <wd-button
-            shape="round"
-            type="default"
-            plain
-            class="action-btn"
-            @click="loadFromModel"
-            :disabled="!modelUrl || loading"
-          >
-            Load from study
-          </wd-button>
-          <wd-button shape="round" type="default" plain class="action-btn" @click="pickNrrd" :disabled="loading">
-            Pick NRRD
-          </wd-button>
-        </view>
         <view class="tips">
           <text>Gesture: drag to rotate, wheel/pinch to zoom.</text>
         </view>
@@ -110,7 +92,7 @@
 
 <script>
 import { getModel } from '../../common/api'
-import { BASE_URL } from '../../common/request'
+import { resolveStudyResourceUrl } from '../../common/request'
 
 const NRRD_TYPES = {
   'uchar': { bytes: 1, ctor: Uint8Array },
@@ -512,8 +494,11 @@ export default {
   data() {
     return {
       studyId: '',
+      viewMode: 'both',
       modelInfo: {},
       modelUrl: '',
+      labelUrl: '',
+      heatmapUrl: '',
       sourceLabel: '-',
       isH5: false,
       statusText: 'Idle',
@@ -544,7 +529,8 @@ export default {
       lastPinch: 0,
       renderPending: false,
       resizeHandler: null,
-      inputHandlers: []
+      inputHandlers: [],
+      autoLoaded: false
     }
   },
   computed: {
@@ -562,6 +548,7 @@ export default {
   },
   async onLoad(query) {
     this.studyId = query.studyId || ''
+    this.viewMode = String(query.view || query.mode || 'both').toLowerCase()
     if (this.studyId) {
       await this.fetchModel()
     }
@@ -577,17 +564,64 @@ export default {
       try {
         this.modelInfo = await getModel(this.studyId)
         this.modelUrl = this.resolveModelUrl()
+        this.labelUrl = this.resolveLabelUrl()
+        this.heatmapUrl = this.resolveHeatmapUrl()
+        this.applyViewMode()
+        this.autoLoadIfReady()
       } catch (err) {
         console.error('getModel error', err)
       }
     },
+    applyViewMode() {
+      const mode = this.viewMode || 'both'
+      if (mode === 'volume') {
+        this.labelUrl = ''
+        return
+      }
+      if (mode === 'label') {
+        if (!this.labelUrl) {
+          this.modelUrl = ''
+          this.setStatus('Label not available')
+          return
+        }
+        this.modelUrl = this.labelUrl
+        this.labelUrl = ''
+      }
+    },
     resolveModelUrl() {
-      const candidates = ['nrrdUrl', 'nrrdPath', 'modelPath', 'filePath', 'url', 'mhaUrl', 'mhaPath']
+      const candidates = [
+        'volumeUrl',
+        'volumePath',
+        'nrrdUrl',
+        'nrrdPath',
+        'modelPath',
+        'filePath',
+        'url'
+      ]
       const raw = candidates.map((key) => this.modelInfo?.[key]).find(Boolean)
       if (!raw) return ''
       if (/^https?:\/\//i.test(raw)) return raw
-      const normalized = raw.startsWith('/') ? raw : `/${raw}`
-      return `${BASE_URL}${normalized}`
+      return resolveStudyResourceUrl(raw)
+    },
+    resolveLabelUrl() {
+      const candidates = ['labelUrl', 'labelPath', 'maskUrl', 'maskPath']
+      const raw = candidates.map((key) => this.modelInfo?.[key]).find(Boolean)
+      if (!raw) return ''
+      if (/^https?:\/\//i.test(raw)) return raw
+      return resolveStudyResourceUrl(raw)
+    },
+    resolveHeatmapUrl() {
+      const candidates = ['heatmapUrl', 'heatmapPath', 'confidenceMap']
+      const raw = candidates.map((key) => this.modelInfo?.[key]).find(Boolean)
+      if (!raw) return ''
+      if (/^https?:\/\//i.test(raw)) return raw
+      return resolveStudyResourceUrl(raw)
+    },
+    autoLoadIfReady() {
+      if (!this.isH5 || !this.glReady || this.autoLoaded) return
+      if (!this.modelUrl) return
+      this.autoLoaded = true
+      this.loadFromModel()
     },
     setStatus(message) {
       this.statusText = message
@@ -703,6 +737,7 @@ void main() {
       this.gl = gl
       this.program = program
       this.glReady = true
+      this.autoLoadIfReady()
       this.setStatus('WebGL ready')
     },
     compileShader(gl, type, source) {
@@ -872,6 +907,10 @@ void main() {
     },
     async loadFromModel() {
       if (!this.modelUrl) return
+      if (this.labelUrl) {
+        await this.loadNrrdPair(this.modelUrl, this.labelUrl, 'Study NRRD + Label')
+        return
+      }
       await this.loadNrrdFromUrl(this.modelUrl, 'Study NRRD')
     },
     async pickNrrd() {
@@ -961,6 +1000,7 @@ void main() {
           this.labelVolume = null
         } else {
           this.labelVolume = labelVolume
+          this.logLabelStats(labelVolume)
         }
         this.volume = flairVolume
         this.dims = flairVolume.dims
@@ -977,6 +1017,24 @@ void main() {
         this.setStatus(`Load failed: ${err.message || err}`)
       } finally {
         this.loading = false
+      }
+    },
+    logLabelStats(volume) {
+      try {
+        const values = volume?.values
+        if (!values) return
+        let min = Number.POSITIVE_INFINITY
+        let max = Number.NEGATIVE_INFINITY
+        let nonZero = 0
+        for (let i = 0; i < values.length; i += 1) {
+          const v = values[i]
+          if (v < min) min = v
+          if (v > max) max = v
+          if (v > 0) nonZero += 1
+        }
+        console.log('[label] stats', { min, max, nonZero })
+      } catch (err) {
+        console.error('label stats error', err)
       }
     },
     async fetchArrayBuffer(targetUrl) {
@@ -1010,7 +1068,9 @@ void main() {
       if (!header._magic || !header._magic.startsWith('NRRD')) {
         throw new Error('Invalid NRRD magic')
       }
-      const dims = (header.sizes || '').split(/\s+/).map((v) => Number(v))
+      const sizeText = header.sizes || header.size || ''
+      const sizeTokens = String(sizeText).match(/-?\d+(?:\.\d+)?/g) || []
+      const dims = sizeTokens.map((v) => Number(v))
       if (dims.length < 3 || dims.some((v) => Number.isNaN(v))) {
         throw new Error('Invalid sizes')
       }
@@ -1276,6 +1336,7 @@ void main() {
   display: block;
 }
 
+
 .placeholder {
   position: absolute;
   inset: 0;
@@ -1318,15 +1379,16 @@ void main() {
   font-size: 24rpx;
 }
 
-.action-grid {
+.action-grid,
+.action-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 16rpx;
+  gap: 12rpx;
 }
 
 .action-btn {
-  flex: 0 0 calc(50% - 8rpx);
-  min-width: 0;
+  flex: 1 1 calc(50% - 6rpx);
+  min-width: 200rpx;
 }
 
 .log {

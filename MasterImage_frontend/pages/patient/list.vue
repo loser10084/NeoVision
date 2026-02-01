@@ -30,9 +30,9 @@
             <text class="name">{{ patient.name }}</text>
             <text class="subtle">{{ patient.sex }} · {{ patient.age }} 岁</text>
           </view>
-          <wd-tag v-if="patient.status === '待复核'" type="warning" plain>待复核</wd-tag>
-          <wd-tag v-else-if="patient.status === '已完成'" type="success" plain>已完成</wd-tag>
-          <wd-tag v-else plain>{{ patient.status || '处理中' }}</wd-tag>
+          <wd-tag :type="statusTagType(patient.status)" plain>
+            {{ formatStatus(patient.status) }}
+          </wd-tag>
         </view>
 
         <view class="meta">
@@ -45,29 +45,6 @@
         </view>
 
         <view class="divider"></view>
-        <view class="progress">
-          <view class="progress-item">
-            <text class="label">GTV 生成</text>
-            <wd-tag plain :type="patient.gtvReady ? 'success' : 'warning'">
-              {{ patient.gtvReady ? '已生成' : '待生成' }}
-            </wd-tag>
-          </view>
-          <view class="progress-item">
-            <text class="label">CTV 精修</text>
-            <wd-tag plain :type="patient.ctvReady ? 'primary' : 'warning'">
-              {{ patient.ctvReady ? '待确认' : '待复核' }}
-            </wd-tag>
-          </view>
-        </view>
-
-        <view class="action-bar">
-          <wd-button size="small" shape="round" type="primary" plain @click.stop="goDetail(patient)">
-            查看详情
-          </wd-button>
-          <wd-button size="small" shape="round" type="default" plain @click.stop="upload(patient)">
-            上传影像
-          </wd-button>
-        </view>
       </view>
 
       <view v-if="patients.length === 0 && !loading" class="empty">
@@ -90,16 +67,60 @@ export default {
     return {
       keyword: '',
       patients: [],
-      loading: false
+      loading: false,
+      lastScrollTop: 0,
+      lastAutoRefreshTs: 0
     }
   },
   onLoad() {
     this.fetchPatients()
   },
+  onShow() {
+    this.fetchPatients({ keyword: this.keyword, silent: true })
+  },
   onPullDownRefresh() {
     this.fetchPatients({ keyword: this.keyword, silent: true })
   },
+  onPageScroll(e) {
+    const current = typeof e?.scrollTop === 'number' ? e.scrollTop : 0
+    if (this.lastScrollTop > 0 && current <= 0) {
+      const now = Date.now()
+      if (!this.loading && now - this.lastAutoRefreshTs > 3000) {
+        this.lastAutoRefreshTs = now
+        this.fetchPatients({ keyword: this.keyword, silent: true })
+      }
+    }
+    this.lastScrollTop = current
+  },
   methods: {
+    formatStatus(status) {
+      if (!status) return '处理中'
+      const raw = String(status)
+      if (/[\u4e00-\u9fa5]/.test(raw)) return raw
+      const key = raw.trim().toUpperCase()
+      const map = {
+        PENDING: '待处理',
+        PROCESSING: '处理中',
+        IN_PROGRESS: '处理中',
+        RUNNING: '处理中',
+        REVIEW: '待复核',
+        REVIEW_PENDING: '待复核',
+        CONFIRMED: '已确认',
+        DONE: '已完成',
+        COMPLETED: '已完成',
+        FINISHED: '已完成',
+        FAILED: '失败',
+        ERROR: '异常'
+      }
+      return map[key] || '处理中'
+    },
+    statusTagType(status) {
+      const label = this.formatStatus(status)
+      if (label === '待复核') return 'warning'
+      if (label === '已完成' || label === '已确认') return 'success'
+      if (label === '失败' || label === '异常') return 'danger'
+      return 'primary'
+    },
     async fetchPatients({ keyword = '', silent = false } = {}) {
       if (!silent) this.loading = true
       try {

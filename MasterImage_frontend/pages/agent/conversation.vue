@@ -141,7 +141,7 @@
 
 <script>
 import { sendAgentMessage, getAgentHistory, sendAgentMessageWithImage } from '../../common/api'
-import { MODEL_BASE_URL, getToken } from '../../common/request'
+import { resolveModelUrl, getToken } from '../../common/request'
 
 export default {
   data() {
@@ -163,9 +163,33 @@ export default {
     }
   },
   async onLoad() {
+    this.loadUserAvatar()
     await this.loadHistory()
   },
   methods: {
+    loadUserAvatar() {
+      const profile = uni.getStorageSync('userProfile') || {}
+      const name = profile?.name ? String(profile.name).trim() : ''
+      if (!name) return
+      this.userAvatar = this.buildInitialsAvatar(name)
+    },
+    buildInitialsAvatar(name) {
+      const initial = name.slice(0, 1)
+      const size = 120
+      const canvas = document.createElement('canvas')
+      canvas.width = size
+      canvas.height = size
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return this.userAvatar
+      ctx.fillStyle = '#0f1012'
+      ctx.fillRect(0, 0, size, size)
+      ctx.fillStyle = '#ffffff'
+      ctx.font = 'bold 64px sans-serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(initial, size / 2, size / 2 + 2)
+      return canvas.toDataURL('image/png')
+    },
     async loadHistory() {
       try {
         const payload = await getAgentHistory()
@@ -325,7 +349,7 @@ export default {
     },
     async streamFromModel(text, agentId) {
       const token = getToken()
-      const response = await fetch(`${MODEL_BASE_URL}/api/agent/chat/stream`, {
+      const response = await fetch(resolveModelUrl('/api/agent/chat/stream'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

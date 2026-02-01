@@ -1,0 +1,29 @@
+﻿server:
+  port: 8080
+
+spring:
+  application:
+    name: smartimage-gateway
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 127.0.0.1:8848
+        ip: 127.0.0.1
+    gateway:
+      routes:
+        - id: auth-service
+          uri: lb://smartimage-auth-service
+          predicates:
+            - Path=/api/auth/**
+        - id: study-service-studies
+          uri: lb://smartimage-study-service
+          predicates:
+            - Path=/api/patients/*/studies/**,/api/studies/**,/api/files/**
+        - id: patient-service-contours
+          uri: lb://smartimage-patient-service
+          predicates:
+            - Path=/api/patients/*/contours/**
+        - id: patient-service
+          uri: lb://smartimage-patient-service
+          predicates:
+            - Path=/api/patients/**

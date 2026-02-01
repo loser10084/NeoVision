@@ -1,4 +1,4 @@
-﻿{
+{
   "pages": [
     {
       "path": "pages/auth/login",
@@ -66,6 +66,39 @@
         "navigationBarTextStyle": "black"
       }
     },
+    {
+      "path": "pages/patient/gtv-draft",
+      "style": {
+        "navigationBarTitleText": "GTV初稿",
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTextStyle": "black"
+      }
+    },
+    {
+      "path": "pages/patient/ctv-refine",
+      "style": {
+        "navigationBarTitleText": "CTV\u5916\u6269",
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTextStyle": "black"
+      }
+    },
+    {
+      "path": "pages/patient/ctv-expand",
+      "style": {
+        "navigationBarTitleText": "CTV\u7cbe\u4fee",
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTextStyle": "black"
+      }
+    },
+    {
+      "path": "pages/patient/ctv-heatmap",
+      "style": {
+        "navigationBarTitleText": "\u7f6e\u4fe1\u5ea6\u70ed\u529b\u56fe",
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTextStyle": "black"
+      }
+    },
+
     {
       "path": "pages/patient/edit",
       "style": {
