@@ -34,3 +34,9 @@ logging:
     com:
       yunchuan:
         smartimage_backend: info
+
+alioss:
+  access-key-id: LTAI5tQR1DCR4xsdN3E4ySJ8
+  access-key-secret: BLtkCVoUl2Pmpn8x17PBa6kigdYkYb
+  endpoint: oss-cn-hangzhou.aliyuncs.com
+  bucket-name: smart-image-1

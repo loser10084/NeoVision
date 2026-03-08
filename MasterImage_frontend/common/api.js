@@ -1,4 +1,4 @@
-import { request, requestModel, setAuth, clearAuth, resolveModelUrl, getToken } from './request'
+import { request, requestModel, setAuth, clearAuth, resolveModelUrl, resolveApiUrl, getToken } from './request'
 
 // 认证
 export function login(payload) {
@@ -75,7 +75,7 @@ export function segmentStudyMultimodal(studyId, payload) {
   return request({ url: `/api/studies/${studyId}/segment/multimodal`, method: 'POST', data: payload })
 }
 
-// AI 结果/靶区
+// AI 结果/分区
 export function getContours(id) {
   return request({ url: `/api/patients/${id}/contours`, method: 'GET' })
 }
@@ -118,7 +118,7 @@ export function submitCtvExpand(payload) {
   })
 }
 
-// 智能体交互
+// 智能体对话
 export function sendAgentMessage(payload) {
   const data = typeof payload === 'string' ? { prompt: payload } : payload
   return requestModel({ url: '/api/agent/chat', method: 'POST', data })
@@ -159,6 +159,89 @@ export function sendAgentMessageWithImage(prompt, imagePath) {
 export function getAgentHistory() {
   return requestModel({ url: '/api/agent/history', method: 'GET' })
 }
+// 社交/联合会诊
+export function searchDoctors(keyword = '') {
+  return request({ url: '/api/patients/social/doctors', method: 'GET', data: keyword ? { keyword } : {} })
+}
+
+export function listFriends() {
+  return request({ url: '/api/patients/social/friends', method: 'GET' })
+}
+
+export function addFriend(friendId) {
+  return request({ url: `/api/patients/social/friends/${friendId}`, method: 'POST' })
+}
+
+export function removeFriend(friendId) {
+  return request({ url: `/api/patients/social/friends/${friendId}`, method: 'DELETE' })
+}
+
+export function listConsultations() {
+  return request({ url: '/api/patients/social/consultations', method: 'GET' })
+}
+
+export function createConsultation(payload) {
+  return request({ url: '/api/patients/social/consultations', method: 'POST', data: payload, showError: false })
+}
+
+export function listConsultationMembers(consultationId) {
+  return request({ url: `/api/patients/social/consultations/${consultationId}/members`, method: 'GET' })
+}
+
+export function addConsultationMember(consultationId, doctorId) {
+  return request({ url: `/api/patients/social/consultations/${consultationId}/members/${doctorId}`, method: 'POST' })
+}
+
+export function removeConsultationMember(consultationId, doctorId) {
+  return request({ url: `/api/patients/social/consultations/${consultationId}/members/${doctorId}`, method: 'DELETE' })
+}
+
+export function listConsultationMessages(consultationId, params = {}) {
+  const query = {}
+  if (params.beforeId) query.beforeId = params.beforeId
+  if (params.limit) query.limit = params.limit
+  return request({ url: `/api/patients/social/consultations/${consultationId}/messages`, method: 'GET', data: query })
+}
+
+export function sendConsultationMessage(consultationId, payload) {
+  return request({ url: `/api/patients/social/consultations/${consultationId}/messages`, method: 'POST', data: payload })
+}
+
+export function uploadConsultationAttachment(consultationId, filePath, options = {}) {
+  return new Promise((resolve, reject) => {
+    const token = getToken()
+    const formData = {}
+    if (options.messageType) {
+      formData.messageType = options.messageType
+    }
+    uni.uploadFile({
+      url: resolveApiUrl(`/api/patients/social/consultations/${consultationId}/attachments`),
+      filePath,
+      name: 'file',
+      formData,
+      header: token ? { Authorization: `Bearer ${token}` } : {},
+      success: (res) => {
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          reject(new Error(`HTTP ${res.statusCode}`))
+          return
+        }
+        try {
+          const payload = JSON.parse(res.data)
+          if (payload?.code !== 0) {
+            reject(payload)
+            return
+          }
+          resolve(payload.data)
+        } catch (err) {
+          reject(err)
+        }
+      },
+      fail: (err) => {
+        reject(err)
+      }
+    })
+  })
+}
 
 export default {
   login,
@@ -188,5 +271,20 @@ export default {
   submitCtvExpand,
   sendAgentMessage,
   sendAgentMessageWithImage,
-  getAgentHistory
+  getAgentHistory,
+  searchDoctors,
+  listFriends,
+  addFriend,
+  removeFriend,
+  listConsultations,
+  createConsultation,
+  listConsultationMembers,
+  addConsultationMember,
+  removeConsultationMember,
+  listConsultationMessages,
+  sendConsultationMessage,
+  uploadConsultationAttachment
 }
+
+
+

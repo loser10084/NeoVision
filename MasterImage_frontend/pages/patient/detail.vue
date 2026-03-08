@@ -1,75 +1,93 @@
 <template>
   <view class="page">
-    <view class="safe-area">
-      <view class="card summary-card">
-        <view class="row">
+    <view class="safe-area detail-area">
+      <view class="detail-hero">
+        <view class="hero-main">
           <view>
-            <text class="name">{{ patient.name || '未命名' }}</text>
-            <text class="subtle">
-              {{ patient.sex || '-' }} / {{ patient.age || '-' }} / {{ patient.stage || '-' }}
-            </text>
+            <text class="hero-name">{{ patient.name || '未命名患者' }}</text>
+            <text class="hero-subtitle">{{ patient.sex || '-' }} / {{ patient.age || '-' }} / {{ patient.stage || '-' }}</text>
           </view>
-          <wd-button size="small" shape="round" type="default" plain @click="editProfile">编辑</wd-button>
+          <button class="mi-btn mi-btn--hero" @click="editProfile">编辑资料</button>
         </view>
-        <view class="meta">
+        <view class="hero-meta">
           <text>ID {{ patient.id || '-' }}</text>
           <text>影像号 {{ patient.studyId || '-' }}</text>
         </view>
+        <view class="hero-kpi-grid">
+          <view class="hero-kpi-item">
+            <text class="hero-kpi-value">{{ studies.length }}</text>
+            <text class="hero-kpi-label">影像序列</text>
+          </view>
+          <view class="hero-kpi-item">
+            <text class="hero-kpi-value">{{ contours.length }}</text>
+            <text class="hero-kpi-label">轮廓结果</text>
+          </view>
+          <view class="hero-kpi-item">
+            <text class="hero-kpi-value">{{ isConfirmed ? '已确认' : '待确认' }}</text>
+            <text class="hero-kpi-label">医生状态</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="card summary-card">
+        <view class="row summary-top-row">
+          <view>
+            <text class="name">病例概览</text>
+            <text class="subtle summary-desc">{{ patient.diagnosis || '暂无诊断信息' }}</text>
+          </view>
+          <text class="status-pill" :class="`status-pill--${confirmButtonType}`">{{ confirmButtonText }}</text>
+        </view>
         <view class="meta">
-          <text>{{ patient.diagnosis || '-' }}</text>
+          <text>最近更新</text>
           <text>{{ patient.lastUpdate || '-' }}</text>
         </view>
-        <view class="action-bar">
-          <wd-button
-            size="small"
-            shape="round"
-            :type="confirmButtonType"
-            :plain="!isConfirmed"
-            @click="confirmContour"
-          >
-            {{ confirmButtonText }}
-          </wd-button>
-          <wd-button size="small" shape="round" type="default" plain @click="exportRT">
-            导出结构
-          </wd-button>
-          <wd-button size="small" shape="round" type="danger" plain @click="confirmDeletePatient">
-              {{ deletePatientText }}
-            </wd-button>
+        <view class="action-bar summary-actions">
+          <button class="mi-btn mi-btn--primary" @click="confirmContour">{{ confirmButtonText }}</button>
+          <button class="mi-btn mi-btn--ghost" @click="exportRT">导出结构</button>
+          <button class="mi-btn mi-btn--danger" @click="confirmDeletePatient">{{ deletePatientText }}</button>
         </view>
       </view>
 
       <view class="card ai-card">
         <view class="section-title">靶区 AI 结果</view>
-        <wd-cell-group>
-          <wd-cell title="GTV 初稿" is-link @click="openGtvDraft(patient.studyId)">
-            <wd-tag slot="value" :type="gtvStatusType" plain>{{ gtvStatusText }}</wd-tag>
-          </wd-cell>
-          <wd-cell title="CTV 外扩" is-link @click="openCtvRefine(patient.studyId)">
-            <wd-tag slot="value" :type="ctvExpandStatusType" plain>{{ ctvExpandStatusText }}</wd-tag>
-          </wd-cell>
-          <wd-cell title="CTV 精修" is-link @click="openCtvExpand(patient.studyId)">
-            <wd-tag slot="value" :type="ctvStatusType" plain>{{ ctvStatusText }}</wd-tag>
-          </wd-cell>
-          <wd-cell title="置信度热力图" is-link @click="openHeatmap(patient.studyId)">
-            <wd-tag slot="value" type="warning" plain>可查看</wd-tag>
-          </wd-cell>
-        </wd-cell-group>
+        <view class="result-list">
+          <view class="result-row" @click="openGtvDraft(patient.studyId)">
+            <text class="row-title">GTV 初稿</text>
+            <view class="row-right">
+              <text class="status-pill" :class="`status-pill--${gtvStatusType}`">{{ gtvStatusText }}</text>
+              <text class="row-arrow">›</text>
+            </view>
+          </view>
+          <view class="result-row" @click="openCtvRefine(patient.studyId)">
+            <text class="row-title">CTV 外扩</text>
+            <view class="row-right">
+              <text class="status-pill" :class="`status-pill--${ctvExpandStatusType}`">{{ ctvExpandStatusText }}</text>
+              <text class="row-arrow">›</text>
+            </view>
+          </view>
+          <view class="result-row" @click="openCtvExpand(patient.studyId)">
+            <text class="row-title">CTV 精修</text>
+            <view class="row-right">
+              <text class="status-pill" :class="`status-pill--${ctvStatusType}`">{{ ctvStatusText }}</text>
+              <text class="row-arrow">›</text>
+            </view>
+          </view>
+          <view class="result-row" @click="openHeatmap(patient.studyId)">
+            <text class="row-title">置信度热力图</text>
+            <view class="row-right">
+              <text class="status-pill status-pill--warning">可查看</text>
+              <text class="row-arrow">›</text>
+            </view>
+          </view>
+        </view>
       </view>
 
-      <view class="card">
-        <view class="section-header">
+      <view class="card sequence-card">
+        <view class="section-header section-header--edge">
           <view class="section-title">影像序列</view>
-          <wd-button
-            size="small"
-            shape="round"
-            type="primary"
-            plain
-            :loading="uploading"
-            :disabled="uploading"
-            @click="openUploadSheet()"
-          >
-              新增影像
-            </wd-button>
+          <button class="mi-btn mi-btn--primary" :disabled="uploading" @click="openUploadSheet()">
+            {{ uploading ? '上传中...' : '新增影像' }}
+          </button>
         </view>
         <view v-for="item in studies" :key="item.id" class="study">
           <view class="row">
@@ -77,7 +95,7 @@
               <text class="label">{{ item.modality || '-' }}</text>
               <text class="subtle">{{ truncateText(item.desc || '暂无描述', 10) }}</text>
             </view>
-            <wd-tag plain>{{ item.status || '处理中' }}</wd-tag>
+            <text class="status-pill status-pill--default">{{ item.status || '处理中' }}</text>
           </view>
           <view class="meta">
             <text>序列号 {{ item.id }}</text>
@@ -86,68 +104,28 @@
           <view class="study-modalities">
             <view v-for="modality in modalityOrder" :key="modality" class="modality-item">
               <text class="label">{{ modalityLabel(modality) }}</text>
-              <wd-tag plain :type="modalityTagType(item.id, modality)">
+              <text class="status-pill" :class="`status-pill--${modalityTagType(item.id, modality)}`">
                 {{ modalityTagText(item.id, modality) }}
-              </wd-tag>
+              </text>
             </view>
           </view>
-
           <view class="study-status-row">
             <view class="status-item">
               <text class="label">Label</text>
-              <wd-tag plain :type="studyLabelMap[item.id] ? 'success' : 'warning'">
+              <text class="status-pill" :class="studyLabelMap[item.id] ? 'status-pill--success' : 'status-pill--warning'">
                 {{ studyLabelMap[item.id] ? '已生成' : '未生成' }}
-              </wd-tag>
+              </text>
             </view>
           </view>
           <view class="study-actions-main">
-            <wd-button
-              size="small"
-              shape="round"
-              type="default"
-              plain
-              :loading="uploading"
-              :disabled="uploading"
-              @click="openUploadSheet(item)"
-            >
-              上传影像
-            </wd-button>
-            <wd-button
-              size="small"
-              shape="round"
-              type="primary"
-              plain
-              :disabled="!studyVolumeMap[item.id]"
-              @click="open3DCombined(item.id)"
-            >
-              3D 查看
-            </wd-button>
-            <wd-button size="small" shape="round" type="default" plain @click="openStudyActions(item)">
-              更多
-            </wd-button>
+            <button class="mi-btn mi-btn--ghost" :disabled="uploading" @click="openUploadSheet(item)">上传影像</button>
+            <button class="mi-btn mi-btn--primary" :disabled="!studyVolumeMap[item.id]" @click="open3DCombined(item.id)">3D 查看</button>
+            <button class="mi-btn mi-btn--ghost" @click="openStudyActions(item)">更多</button>
           </view>
-
-          
         </view>
-        
       </view>
     </view>
   </view>
-
-  <wd-action-sheet
-    v-model="studyActionSheetVisible"
-    title="更多操作"
-    cancel-text="取消"
-    :actions="studyActionSheetActions"
-    @select="handleStudyActionSelect"
-  />
-  <wd-action-sheet
-    v-model="uploadSheetVisible"
-    title="上传影像"
-    cancel-text="关闭"
-    :actions="uploadSheetActions"
-    @select="handleUploadSheetSelect"
-  />
 </template>
 
 <script>
@@ -177,11 +155,7 @@ export default {
       studyVolumeMap: {},
       studyFileMap: {},
       modalityOrder: ['flair', 't1', 't1c', 't2'],
-      uploadSheetVisible: false,
-      uploadSheetActions: [],
       activeUploadStudyId: null,
-      studyActionSheetVisible: false,
-      studyActionSheetActions: [],
       activeStudyId: null,
       deletePatientText: '\u5220\u9664\u60a3\u8005',
       deleteStudyText: '\u5220\u9664\u5e8f\u5217',
@@ -366,8 +340,16 @@ export default {
     },
     openUploadSheet(item) {
       this.activeUploadStudyId = item?.id || null
-      this.uploadSheetActions = this.buildUploadActions(this.activeUploadStudyId)
-      this.uploadSheetVisible = true
+      const actions = this.buildUploadActions(this.activeUploadStudyId)
+      if (!actions.length) return
+      uni.showActionSheet({
+        itemList: actions.map((action) => action.name),
+        success: ({ tapIndex }) => {
+          const selected = actions[tapIndex]
+          if (!selected?.id) return
+          this.handleUploadModality(selected.id)
+        }
+      })
     },
     buildUploadActions(studyId) {
       const actions = (this.modalityOrder || []).map((modality) => {
@@ -384,11 +366,6 @@ export default {
         id: 'label'
       })
       return actions
-    },
-
-    handleUploadSheetSelect({ item }) {
-      if (!item?.id) return
-      this.handleUploadModality(item.id)
     },
     async handleUploadModality(modality) {
       if (this.uploading) return
@@ -511,15 +488,18 @@ export default {
       const studyId = item?.id
       if (!studyId) return
       this.activeStudyId = studyId
-      this.studyActionSheetActions = this.buildStudyActions(studyId)
-      this.studyActionSheetVisible = true
-    },
-    handleStudyActionSelect({ item }) {
-      const studyId = this.activeStudyId
-      if (!studyId || !item?.id) return
-      if (item.id === 'delete') {
-        this.confirmDeleteStudy({ id: studyId })
-      }
+      const actions = this.buildStudyActions(studyId)
+      if (!actions.length) return
+      uni.showActionSheet({
+        itemList: actions.map((action) => action.name),
+        success: ({ tapIndex }) => {
+          const selected = actions[tapIndex]
+          if (!selected?.id) return
+          if (selected.id === 'delete') {
+            this.confirmDeleteStudy({ id: studyId })
+          }
+        }
+      })
     },
     async fetchContours() {
       try {
@@ -770,15 +750,172 @@ export default {
 <style scoped>
 .page {
   min-height: 100vh;
-  background: #f7f7f8;
+  background: #edf4ff;
+}
+
+.detail-area {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.detail-hero {
+  background: linear-gradient(155deg, #2f78d8 0%, #3888ee 44%, #62a6f4 100%);
+  border-radius: 28rpx;
+  padding: 24rpx;
+  box-shadow: 0 14rpx 44rpx rgba(42, 106, 188, 0.28);
+}
+
+.hero-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.hero-name {
+  display: block;
+  font-size: 38rpx;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.hero-subtitle {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.84);
+}
+
+.hero-meta {
+  margin-top: 14rpx;
+  display: flex;
+  justify-content: space-between;
+  gap: 12rpx;
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.hero-kpi-grid {
+  margin-top: 16rpx;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10rpx;
+}
+
+.hero-kpi-item {
+  border-radius: 16rpx;
+  padding: 12rpx;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1rpx solid rgba(255, 255, 255, 0.26);
+}
+
+.hero-kpi-value {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.hero-kpi-label {
+  display: block;
+  margin-top: 4rpx;
+  font-size: 22rpx;
+  color: rgba(255, 255, 255, 0.84);
 }
 
 .summary-card {
-  margin-bottom: 18rpx;
+  margin-bottom: 2rpx;
+}
+
+.summary-top-row {
+  margin-bottom: 4rpx;
+}
+
+.summary-desc {
+  display: block;
+  margin-top: 6rpx;
+}
+
+.summary-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: stretch;
+  gap: 12rpx;
+  flex-wrap: nowrap;
+}
+
+.summary-actions .mi-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
+  padding: 0 10rpx;
 }
 
 .ai-card {
-  padding-right: 0;
+  padding: 24rpx;
+}
+
+.result-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.result-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16rpx;
+  border-radius: 16rpx;
+  border: 1rpx solid #d6e5f7;
+  background: #f8fbff;
+}
+
+.row-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #173a64;
+}
+
+.row-right {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+}
+
+.row-arrow {
+  color: #7a95b5;
+  font-size: 28rpx;
+}
+
+.sequence-card {
+  padding-bottom: 18rpx;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6rpx;
+}
+
+.section-header--edge {
+  margin-left: -24rpx;
+  margin-right: -24rpx;
+  padding-left: 24rpx;
+  padding-right: 10rpx;
+}
+
+.section-header--edge > .mi-btn {
+  margin-left: auto;
+  margin-right: 0;
+}
+
+.section-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #173a64;
 }
 
 .row {
@@ -793,77 +930,37 @@ export default {
   min-width: 0;
 }
 
-.row :deep(.wd-tag) {
-  flex: 0 0 auto;
-  white-space: nowrap;
-  display: inline-flex;
-  align-items: center;
-}
-
-.card :deep(.wd-cell) {
-  align-items: center;
-}
-
-.card :deep(.wd-cell__title) {
-  flex: 1;
-  min-width: 0;
-}
-
-.card :deep(.wd-cell__label) {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.card :deep(.wd-cell__value) {
-  flex: 0 0 auto;
-  white-space: nowrap;
-}
-
-.card :deep(.wd-cell__value .wd-tag) {
-  white-space: nowrap;
-  display: inline-flex;
-  align-items: center;
-}
-
-.card :deep(.wd-cell__right) {
-  margin-left: auto;
-}
-
-.link {
-  color: #1a5ed7;
-  text-decoration: underline;
-}
-
-.ai-card :deep(.wd-cell) {
-  padding-right: 0 !important;
-}
-
-.ai-card :deep(.wd-cell__right) {
-  margin-right: 0 !important;
-}
-
-.ai-card :deep(.wd-cell__value) {
-  margin-left: auto;
-}
-
 .name {
   display: block;
   font-size: 34rpx;
   font-weight: 700;
-  color: #0c0d0f;
+  color: #173a64;
+}
+
+.label {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #234567;
 }
 
 .meta {
   display: flex;
   justify-content: space-between;
-  color: #6b7075;
-  font-size: 26rpx;
+  color: #5f7899;
+  font-size: 25rpx;
   margin-top: 12rpx;
 }
 
 .study {
-  padding: 10rpx 0 16rpx;
+  margin-top: 12rpx;
+  padding: 16rpx;
+  border-radius: 18rpx;
+  background: #f8fbff;
+  border: 1rpx solid #d8e6f8;
+}
+
+.study + .study {
+  margin-top: 12rpx;
 }
 
 .study-modalities {
@@ -875,13 +972,13 @@ export default {
 
 .modality-item {
   padding: 10rpx;
-  background: #f7f7f9;
-  border-radius: 16rpx;
+  background: #ffffff;
+  border-radius: 14rpx;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12rpx;
-  border: 1rpx solid #e6e7eb;
+  border: 1rpx solid #d6e5f7;
 }
 
 .study-status-row {
@@ -893,27 +990,125 @@ export default {
 
 .status-item {
   padding: 12rpx;
-  background: #f7f7f9;
-  border-radius: 16rpx;
+  background: #ffffff;
+  border-radius: 14rpx;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12rpx;
+  border: 1rpx solid #d6e5f7;
 }
 
 .study-actions-main {
   display: flex;
   flex-direction: row;
   flex-wrap: nowrap;
-  align-items: center;
+  justify-content: space-between;
+  align-items: stretch;
   gap: 12rpx;
   margin-top: 10rpx;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
 }
 
-.study-actions-main :deep(.wd-button) {
+.study-actions-main .mi-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
+  padding: 0 10rpx;
+}
+
+.subtle {
+  color: #5f7899;
+  font-size: 24rpx;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 8rpx 16rpx;
+  border-radius: 999rpx;
+  border: 1rpx solid #d6e5f7;
+  font-size: 22rpx;
+  color: #4f6788;
+  background: #f8fbff;
+}
+
+.status-pill--primary {
+  color: #245eac;
+  border-color: #bfd5ef;
+  background: #eaf3ff;
+}
+
+.status-pill--success {
+  color: #1f8b4c;
+  border-color: #bce2cb;
+  background: #f3fbf6;
+}
+
+.status-pill--warning {
+  color: #b27613;
+  border-color: #f2dfbe;
+  background: #fdf8ef;
+}
+
+.status-pill--default {
+  color: #6a84a6;
+  border-color: #d6e5f7;
+  background: #f8fbff;
+}
+
+.mi-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  height: 68rpx;
+  line-height: 68rpx;
+  padding: 0 24rpx;
+  border-radius: 999rpx;
+  font-size: 25rpx;
+  border: 1rpx solid #c8daf4;
+  background: #ffffff;
+  color: #2f4f73;
+  box-shadow: 0 8rpx 20rpx rgba(47, 120, 216, 0.12);
   flex: 0 0 auto;
 }
+
+.mi-btn--primary {
+  background: linear-gradient(135deg, #2f78d8 0%, #245eac 100%);
+  border-color: transparent;
+  color: #ffffff;
+  box-shadow: 0 12rpx 28rpx rgba(47, 120, 216, 0.26);
+}
+
+.mi-btn--ghost {
+  background: #ffffff;
+}
+
+.mi-btn--danger {
+  background: #fff5f5;
+  border-color: #f3c2c2;
+  color: #b13d3d;
+  box-shadow: 0 8rpx 18rpx rgba(214, 92, 92, 0.18);
+}
+
+.mi-btn--hero {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.42);
+  color: #ffffff;
+  box-shadow: none;
+}
+
+.mi-btn[disabled] {
+  opacity: 0.55;
+  box-shadow: none;
+}
+
+button::after {
+  border: none;
+}
 </style>
+
+
+
+
 

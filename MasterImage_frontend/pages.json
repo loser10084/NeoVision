@@ -1,4 +1,4 @@
-{
+﻿{
   "pages": [
     {
       "path": "pages/auth/login",
@@ -77,7 +77,7 @@
     {
       "path": "pages/patient/ctv-refine",
       "style": {
-        "navigationBarTitleText": "CTV\u5916\u6269",
+        "navigationBarTitleText": "CTV精修",
         "navigationBarBackgroundColor": "#ffffff",
         "navigationBarTextStyle": "black"
       }
@@ -85,7 +85,7 @@
     {
       "path": "pages/patient/ctv-expand",
       "style": {
-        "navigationBarTitleText": "CTV\u7cbe\u4fee",
+        "navigationBarTitleText": "CTV外扩",
         "navigationBarBackgroundColor": "#ffffff",
         "navigationBarTextStyle": "black"
       }
@@ -93,12 +93,11 @@
     {
       "path": "pages/patient/ctv-heatmap",
       "style": {
-        "navigationBarTitleText": "\u7f6e\u4fe1\u5ea6\u70ed\u529b\u56fe",
+        "navigationBarTitleText": "置信度热力图",
         "navigationBarBackgroundColor": "#ffffff",
         "navigationBarTextStyle": "black"
       }
     },
-
     {
       "path": "pages/patient/edit",
       "style": {
@@ -110,7 +109,7 @@
     {
       "path": "pages/model/viewer",
       "style": {
-        "navigationBarTitleText": "3D 模型",
+        "navigationBarTitleText": "3D模型",
         "navigationBarBackgroundColor": "#ffffff",
         "navigationBarTextStyle": "black"
       }
@@ -120,12 +119,12 @@
     "navigationBarTextStyle": "black",
     "navigationBarTitleText": "智影",
     "navigationBarBackgroundColor": "#ffffff",
-    "backgroundColor": "#ffffff"
+    "backgroundColor": "#f7fbff"
   },
   "tabBar": {
-    "color": "#7a7e85",
-    "selectedColor": "#0f1012",
-    "backgroundColor": "#ffffff",
+    "color": "#6f85a4",
+    "selectedColor": "#2f78d8",
+    "backgroundColor": "#f7fbff",
     "borderStyle": "black",
     "list": [
       {

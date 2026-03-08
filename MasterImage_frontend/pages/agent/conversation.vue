@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <view class="page">
     <view class="header">
       <view class="back" @click="goBack">
@@ -6,115 +6,107 @@
       </view>
       <image class="header-avatar" src="/static/project_icon.jpg" mode="aspectFill" />
       <view class="header-info">
-        <text class="header-name">智能体助手</text>
-        <text class="header-status">在线</text>
+        <text class="header-name">{{ headerTitle }}</text>
+        <text class="header-status">{{ headerStatus }}</text>
+      </view>
+      <text v-if="isConsultation" class="member-entry" @click="toggleMemberPanel">成员</text>
+    </view>
+
+    <view class="context-strip">
+      <text class="context-chip">{{ isConsultation ? '联合会诊' : '灵犀智影AI助手' }}</text>
+      <text class="context-chip">{{ isConsultation ? `成员 ${members.length}` : '医学影像模式' }}</text>
+      <text v-if="isConsultation && consultationId" class="context-chip">#{{ consultationId }}</text>
+    </view>
+
+    <view v-if="showMemberPanel && isConsultation" class="member-panel">
+      <view class="member-panel-head">
+        <text class="member-panel-title">会诊成员</text>
+        <text class="member-panel-action" @click="loadConsultationContext">刷新</text>
+      </view>
+
+      <view class="member-list">
+        <view v-for="member in members" :key="member.doctorId" class="member-item">
+          <view>
+            <text class="member-name">{{ member.name || `医生${member.doctorId}` }}</text>
+            <text class="member-meta">{{ member.hospital || '-' }} / {{ member.dept || '-' }} / {{ member.role || 'MEMBER' }}</text>
+          </view>
+          <text v-if="canOperateMember(member)" class="member-remove" @click="removeMemberFromConsultation(member)">移除</text>
+        </view>
+      </view>
+
+      <view class="member-panel-head member-panel-head--sub">
+        <text class="member-panel-title">从好友中添加</text>
+      </view>
+      <view class="friend-list">
+        <view v-for="friend in addableFriends" :key="friend.id" class="friend-item">
+          <view>
+            <text class="friend-name">{{ friend.name || `医生${friend.id}` }}</text>
+            <text class="friend-meta">{{ friend.hospital || '-' }} / {{ friend.dept || '-' }}</text>
+          </view>
+          <text class="friend-add" @click="addMemberToConsultation(friend)">添加</text>
+        </view>
       </view>
     </view>
 
-    <scroll-view
-      class="message-list"
-      scroll-y
-      :scroll-with-animation="true"
-      :scroll-into-view="scrollTarget"
-    >
+    <scroll-view class="message-list" scroll-y :scroll-with-animation="true" :scroll-into-view="scrollTarget">
       <view
         v-for="message in messages"
         :key="message.id"
-        :id="message.id"
+        :id="String(message.id)"
         class="message"
-        :class="message.role"
+        :class="message.self ? 'user' : 'other'"
       >
-        <image
-          class="avatar"
-          :class="message.role"
-          :src="message.role === 'user' ? userAvatar : agentAvatar"
-          mode="aspectFill"
-        />
-        <view class="bubble">
-          <image
-            v-if="message.imageUrl"
-            class="message-image"
-            :src="message.imageUrl"
-            mode="aspectFill"
-          />
-          <view v-if="isTyping(message)" class="typing">
-            <view class="typing-dot"></view>
-            <view class="typing-dot"></view>
-            <view class="typing-dot"></view>
-          </view>
-          <view
-            v-else
-            v-for="(block, blockIndex) in getMessageBlocks(message.content)"
-            :key="`${message.id}-block-${blockIndex}`"
-            class="block"
-          >
-            <text v-if="block.type === 'heading'" class="msg-heading" space="preserve" selectable>
-              <text
-                v-for="(seg, segIndex) in getInlineSegments(block.text)"
-                :key="`${message.id}-heading-${blockIndex}-${segIndex}`"
-                space="preserve"
-              >
-                <text v-if="seg.type === 'link'" class="msg-link" space="preserve" @click="openLink(seg.href)">
-                  {{ seg.text }}
-                </text>
-                <text v-else :class="getInlineClass(seg.type)" space="preserve">
-                  {{ seg.text }}
-                </text>
-              </text>
-            </text>
-            <view v-else-if="block.type === 'list'" class="msg-list">
-              <view
-                v-for="(item, itemIndex) in block.items"
-                :key="`${message.id}-item-${blockIndex}-${itemIndex}`"
-                class="msg-list-item"
-              >
-                <text class="msg-list-bullet">{{ item.marker }}</text>
-                <text class="msg-list-text" space="preserve" selectable>
-                  <text
-                    v-for="(seg, segIndex) in getInlineSegments(item.text)"
-                    :key="`${message.id}-item-${blockIndex}-${itemIndex}-${segIndex}`"
-                    space="preserve"
-                  >
-                    <text v-if="seg.type === 'link'" class="msg-link" space="preserve" @click="openLink(seg.href)">
-                      {{ seg.text }}
-                    </text>
-                    <text v-else :class="getInlineClass(seg.type)" space="preserve">
-                      {{ seg.text }}
-                    </text>
-                  </text>
-                </text>
-              </view>
+        <image class="avatar" :class="message.self ? 'user' : 'other'" :src="message.self ? userAvatar : agentAvatar" mode="aspectFill" />
+
+        <view class="bubble-wrap">
+          <view class="bubble" :class="message.self ? 'user' : 'other'">
+            <view v-if="message.type === 'typing'" class="typing">
+              <view class="typing-dot"></view>
+              <view class="typing-dot"></view>
+              <view class="typing-dot"></view>
             </view>
-            <text v-else-if="block.type === 'code'" class="msg-code" space="preserve" selectable>{{ block.text }}</text>
-            <text v-else class="msg-paragraph" space="preserve" selectable>
-              <text
-                v-for="(seg, segIndex) in getInlineSegments(block.text)"
-                :key="`${message.id}-para-${blockIndex}-${segIndex}`"
-                space="preserve"
-              >
-                <text v-if="seg.type === 'link'" class="msg-link" space="preserve" @click="openLink(seg.href)">
-                  {{ seg.text }}
-                </text>
-                <text v-else :class="getInlineClass(seg.type)" space="preserve">
-                  {{ seg.text }}
-                </text>
-              </text>
-            </text>
+
+            <template v-else>
+              <text v-if="message.senderName && !message.self && isConsultation" class="sender-name">{{ message.senderName }}</text>
+
+              <image
+                v-if="message.type === 'IMAGE' && message.ossPath"
+                class="message-image"
+                :src="message.ossPath"
+                mode="aspectFill"
+                @click="openOssPath(message.ossPath)"
+              />
+
+              <view v-if="message.type !== 'TEXT' && message.type !== 'IMAGE'" class="file-box" @click="openOssPath(message.ossPath)">
+                <wd-icon name="folder" size="20" color="#2f78d8" />
+                <view class="file-meta">
+                  <text class="file-name">{{ message.fileName || message.type || '附件' }}</text>
+                  <text class="file-sub">点击查看</text>
+                </view>
+              </view>
+
+              <text v-if="message.content" class="msg-text" space="preserve">{{ message.content }}</text>
+            </template>
           </view>
+
+          <text v-if="message.createdAt" class="msg-time">{{ shortTime(message.createdAt) }}</text>
         </view>
       </view>
     </scroll-view>
 
-    <view v-if="pendingImage" class="input-preview">
-      <image class="preview-image" :src="pendingImage.path" mode="aspectFill" />
-      <view class="preview-meta">
-        <text class="preview-label">已选择图片</text>
-        <text class="preview-name">{{ pendingImage.name || 'image' }}</text>
+    <view v-if="pendingAttachment" class="input-preview">
+      <view class="preview-main">
+        <wd-icon name="folder" size="18" color="#2f78d8" />
+        <view class="preview-meta">
+          <text class="preview-label">待发送附件</text>
+          <text class="preview-name">{{ pendingAttachment.name || pendingAttachment.path }}</text>
+        </view>
       </view>
-      <wd-icon name="close" class="preview-remove" @click="clearImage" />
+      <wd-icon name="close" class="preview-remove" @click="clearAttachment" />
     </view>
+
     <view class="input-bar">
-      <view class="image-picker" @click="chooseImage">
+      <view class="image-picker" @click="chooseAttachment">
         <wd-icon name="add" />
       </view>
       <wd-input
@@ -123,14 +115,13 @@
         confirm-type="send"
         :disabled="loading"
         @confirm="handleConfirm"
-        @compositionstart="onCompositionStart"
-        @compositionend="onCompositionEnd"
       />
       <wd-button
         size="small"
         type="primary"
+        class="send-btn"
         :loading="loading"
-        :disabled="loading || (!input.trim() && !pendingImage)"
+        :disabled="loading || (!input.trim() && !pendingAttachment)"
         @click="send"
       >
         发送
@@ -140,7 +131,18 @@
 </template>
 
 <script>
-import { sendAgentMessage, getAgentHistory, sendAgentMessageWithImage } from '../../common/api'
+import {
+  sendAgentMessage,
+  getAgentHistory,
+  sendAgentMessageWithImage,
+  listConsultationMessages,
+  sendConsultationMessage,
+  uploadConsultationAttachment,
+  listConsultationMembers,
+  listFriends,
+  addConsultationMember,
+  removeConsultationMember
+} from '../../common/api'
 import { resolveModelUrl, getToken } from '../../common/request'
 
 export default {
@@ -151,31 +153,73 @@ export default {
       scrollTarget: '',
       userAvatar: '/static/logo.png',
       agentAvatar: '/static/project_icon.jpg',
-      pendingImage: null,
-      isComposing: false,
-      messages: [
-        {
-          id: 'welcome',
-          role: 'agent',
-          content: '你好，我是智能体助手，有什么需要我帮你？'
-        }
-      ]
+      pendingAttachment: null,
+      messages: [],
+      mode: 'ai',
+      consultationId: null,
+      consultationTitle: '',
+      currentUserId: null,
+      members: [],
+      friends: [],
+      showMemberPanel: false
     }
   },
-  async onLoad() {
-    this.loadUserAvatar()
-    await this.loadHistory()
+  computed: {
+    isConsultation() {
+      return this.mode === 'consultation'
+    },
+    headerTitle() {
+      return this.isConsultation ? (this.consultationTitle || '联合会诊') : '灵犀智影AI助手'
+    },
+    headerStatus() {
+      if (this.isConsultation) {
+        return `${this.members.length || 0} 位医生协作中`
+      }
+      return '在线'
+    },
+    addableFriends() {
+      const current = new Set((this.members || []).map((m) => Number(m.doctorId)))
+      return (this.friends || []).filter((friend) => !current.has(Number(friend.id)))
+    }
+  },
+  async onLoad(options) {
+    this.loadUserProfile()
+    const consultationId = options?.consultationId ? Number(options.consultationId) : null
+    if (consultationId && !Number.isNaN(consultationId)) {
+      this.mode = 'consultation'
+      this.consultationId = consultationId
+      this.consultationTitle = options?.title ? decodeURIComponent(options.title) : ''
+      await this.loadConsultationContext()
+      return
+    }
+
+    this.mode = 'ai'
+    this.appendLocalMessage({
+      id: `welcome-${Date.now()}`,
+      self: false,
+      type: 'TEXT',
+      content: '你好，我是灵犀智影AI助手，请输入你的问题。',
+      createdAt: ''
+    })
+    await this.loadAiHistory()
   },
   methods: {
-    loadUserAvatar() {
+    loadUserProfile() {
       const profile = uni.getStorageSync('userProfile') || {}
+      const id = profile?.id || profile?.userId || profile?.doctorId
+      if (id !== undefined && id !== null && id !== '') {
+        const parsed = Number(id)
+        this.currentUserId = Number.isNaN(parsed) ? null : parsed
+      }
       const name = profile?.name ? String(profile.name).trim() : ''
-      if (!name) return
-      this.userAvatar = this.buildInitialsAvatar(name)
+      if (name) {
+        this.userAvatar = this.buildInitialsAvatar(name)
+      }
     },
     buildInitialsAvatar(name) {
       const initial = name.slice(0, 1)
       const size = 120
+      if (typeof document === 'undefined') return this.userAvatar
       const canvas = document.createElement('canvas')
       canvas.width = size
       canvas.height = size
@@ -190,38 +234,69 @@ export default {
       ctx.fillText(initial, size / 2, size / 2 + 2)
       return canvas.toDataURL('image/png')
     },
-    async loadHistory() {
+    async loadAiHistory() {
       try {
         const payload = await getAgentHistory()
         const items = Array.isArray(payload) ? payload : payload?.messages
-        const normalized = this.normalizeHistory(items)
+        const normalized = this.normalizeAiHistory(items)
         if (normalized.length) {
           this.messages = normalized
-          this.$nextTick(() => {
-            const last = this.messages[this.messages.length - 1]
-            if (last) {
-              this.scrollTarget = last.id
-            }
-          })
+          this.scrollToBottom()
         }
       } catch (err) {
         console.error('agent history error', err)
       }
     },
-    normalizeHistory(items) {
+    normalizeAiHistory(items) {
       if (!Array.isArray(items)) return []
       const stamp = Date.now()
       return items
         .map((item, index) => {
           if (!item) return null
           const rawRole = String(item.role || '').toLowerCase()
-          const role = rawRole === 'assistant' ? 'agent' : rawRole
-          if (role !== 'user' && role !== 'agent') return null
+          const self = rawRole === 'user'
           const content = String(item.content || '').trim()
           if (!content) return null
-          return { id: `history-${stamp}-${index}`, role, content }
+          return {
+            id: `history-${stamp}-${index}`,
+            self,
+            type: 'TEXT',
+            content,
+            createdAt: ''
+          }
         })
         .filter(Boolean)
+    },
+    async loadConsultationContext() {
+      if (!this.consultationId) return
+      try {
+        const [messages, members, friends] = await Promise.all([
+          listConsultationMessages(this.consultationId, { limit: 100 }),
+          listConsultationMembers(this.consultationId),
+          listFriends()
+        ])
+        const list = Array.isArray(messages) ? messages.slice().reverse() : []
+        this.messages = list.map((item) => this.mapConsultationMessage(item))
+        this.members = Array.isArray(members) ? members : []
+        this.friends = Array.isArray(friends) ? friends : []
+        this.scrollToBottom()
+      } catch (err) {
+        console.error('load consultation context failed', err)
+      }
+    },
+    mapConsultationMessage(item) {
+      const messageType = String(item?.messageType || 'TEXT').toUpperCase()
+      const senderId = Number(item?.senderId)
+      return {
+        id: item?.id || `msg-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        self: this.currentUserId !== null && senderId === this.currentUserId,
+        senderName: item?.senderName || '',
+        type: messageType,
+        content: String(item?.textContent || ''),
+        ossPath: item?.ossPath || '',
+        fileName: item?.fileName || '',
+        createdAt: item?.createdAt || ''
+      }
     },
     goBack() {
       const pages = getCurrentPages()
@@ -231,95 +306,58 @@ export default {
       }
       uni.switchTab({ url: '/pages/agent/chat' })
     },
-    send() {
-      const text = this.input.trim()
-      if (this.loading) return
-      if (!text && !this.pendingImage) return
-      if (this.pendingImage) {
-        this.sendImageMessage(text)
-        return
-      }
-      this.appendMessage('user', text)
-      this.input = ''
-      this.fetchReplyStream(text)
+    toggleMemberPanel() {
+      this.showMemberPanel = !this.showMemberPanel
     },
-    handleConfirm() {
-      if (this.isComposing) return
-      this.send()
+    canOperateMember(member) {
+      if (!member) return false
+      if (String(member.role || '').toUpperCase() === 'OWNER') return false
+      return true
     },
-    onCompositionStart() {
-      this.isComposing = true
-    },
-    onCompositionEnd() {
-      this.isComposing = false
-    },
-    async sendImageMessage(text) {
-      const image = this.pendingImage
-      if (!image) return
-      this.appendMessage('user', text || '[图片]', { imageUrl: image.path })
-      this.input = ''
-      this.pendingImage = null
-      const agentId = this.appendMessage('agent', '')
-      this.loading = true
+    async addMemberToConsultation(friend) {
+      if (!this.consultationId || !friend?.id) return
       try {
-        const data = await sendAgentMessageWithImage(text, image.path)
-        const reply = this.normalizeReply(data)
-        this.updateMessage(agentId, reply)
+        await addConsultationMember(this.consultationId, friend.id)
+        uni.showToast({ title: '成员已添加', icon: 'success' })
+        await this.loadConsultationContext()
       } catch (err) {
-        console.error('agent image chat error', err)
-        this.updateMessage(agentId, '抱歉，智能体暂时无法响应，请稍后再试。')
-      } finally {
-        this.loading = false
+        console.error('add member failed', err)
       }
     },
-    async fetchReply(text) {
-      this.loading = true
-      try {
-        const data = await sendAgentMessage(text)
-        const reply = this.normalizeReply(data)
-        this.appendMessage('agent', reply)
-      } catch (err) {
-        console.error('agent chat error', err)
-        this.appendMessage('agent', '抱歉，智能体暂时无法响应，请稍后再试。')
-      } finally {
-        this.loading = false
-      }
-    },
-    async fetchReplyStream(text) {
-      const agentId = this.appendMessage('agent', '')
-      if (!this.canStream()) {
-        await this.fetchReply(text)
-        return
-      }
-      this.loading = true
-      try {
-        await this.streamFromModel(text, agentId)
-      } catch (err) {
-        console.error('agent chat error', err)
-        const existing = this.getMessageContent(agentId)
-        if (!existing) {
-          this.updateMessage(agentId, '抱歉，智能体暂时无法响应，请稍后再试。')
+    async removeMemberFromConsultation(member) {
+      if (!this.consultationId || !member?.doctorId) return
+      uni.showModal({
+        title: '提示',
+        content: `确认移除 ${member.name || '该成员'} 吗？`,
+        success: async (res) => {
+          if (!res.confirm) return
+          try {
+            await removeConsultationMember(this.consultationId, member.doctorId)
+            uni.showToast({ title: '成员已移除', icon: 'success' })
+            await this.loadConsultationContext()
+          } catch (err) {
+            console.error('remove member failed', err)
+          }
         }
-      } finally {
-        this.loading = false
-      }
-    },
-    appendMessage(role, content, extra = {}) {
-      const id = `msg-${Date.now()}-${Math.random().toString(16).slice(2)}`
-      this.messages.push({ id, role, content, ...extra })
-      this.$nextTick(() => {
-        this.scrollTarget = id
       })
-      return id
     },
-    updateMessage(id, content) {
-      const target = this.messages.find((message) => message.id === id)
-      if (target) {
-        target.content = content
-      }
-    },
-    chooseImage() {
+    chooseAttachment() {
       if (this.loading) return
+      const itemList = this.isConsultation ? ['选择图片', '选择文件'] : ['选择图片']
+      uni.showActionSheet({
+        itemList,
+        success: (res) => {
+          if (res.tapIndex === 0) {
+            this.pickImage()
+            return
+          }
+          if (this.isConsultation && res.tapIndex === 1) {
+            this.pickFile()
+          }
+        }
+      })
+    },
+    pickImage() {
       uni.chooseImage({
         count: 1,
         sizeType: ['compressed'],
@@ -327,27 +365,141 @@ export default {
           const path = res.tempFilePaths && res.tempFilePaths[0]
           if (!path) return
           const file = res.tempFiles && res.tempFiles[0]
-          this.pendingImage = { path, name: file?.name || '' }
+          this.pendingAttachment = {
+            path,
+            name: file?.name || this.extractFileName(path),
+            type: 'IMAGE'
+          }
         }
       })
     },
-    clearImage() {
-      this.pendingImage = null
+    pickFile() {
+      if (typeof uni.chooseMessageFile !== 'function') {
+        uni.showToast({ title: '当前端不支持文件选择', icon: 'none' })
+        return
+      }
+      uni.chooseMessageFile({
+        count: 1,
+        type: 'file',
+        success: (res) => {
+          const file = res.tempFiles && res.tempFiles[0]
+          if (!file?.path) return
+          this.pendingAttachment = {
+            path: file.path,
+            name: file.name || this.extractFileName(file.path),
+            type: this.detectAttachmentType(file.name || file.path)
+          }
+        }
+      })
     },
-    getMessageContent(id) {
-      const target = this.messages.find((message) => message.id === id)
-      return target ? target.content : ''
+    clearAttachment() {
+      this.pendingAttachment = null
     },
-    finalizeMessage(id, content) {
-      this.updateMessage(id, this.normalizeMessageContent(content))
+    handleConfirm() {
+      this.send()
     },
-    isTyping(message) {
-      return message.role === 'agent' && !message.content && this.loading
+    async send() {
+      const text = String(this.input || '').trim()
+      if (this.loading) return
+      if (!text && !this.pendingAttachment) return
+
+      if (this.isConsultation) {
+        await this.sendConsultation(text)
+        return
+      }
+      await this.sendAi(text)
+    },
+    async sendAi(text) {
+      if (this.pendingAttachment) {
+        const file = this.pendingAttachment
+        this.appendLocalMessage({
+          id: `local-${Date.now()}`,
+          self: true,
+          type: file.type || 'IMAGE',
+          content: text || '',
+          ossPath: file.path,
+          fileName: file.name || '',
+          createdAt: ''
+        })
+        this.input = ''
+        this.pendingAttachment = null
+
+        const typingId = this.appendTyping()
+        this.loading = true
+        try {
+          const data = await sendAgentMessageWithImage(text, file.path)
+          const reply = this.normalizeAgentReply(data)
+          this.replaceTyping(typingId, reply)
+        } catch (err) {
+          console.error('agent image chat error', err)
+          this.replaceTyping(typingId, '抱歉，智能体暂时无法响应，请稍后重试。')
+        } finally {
+          this.loading = false
+        }
+        return
+      }
+
+      this.appendLocalMessage({
+        id: `local-${Date.now()}`,
+        self: true,
+        type: 'TEXT',
+        content: text,
+        createdAt: ''
+      })
+      this.input = ''
+      const typingId = this.appendTyping()
+      this.loading = true
+
+      try {
+        if (this.canStream()) {
+          await this.streamFromModel(text, typingId)
+        } else {
+          const data = await sendAgentMessage(text)
+          const reply = this.normalizeAgentReply(data)
+          this.replaceTyping(typingId, reply)
+        }
+      } catch (err) {
+        console.error('agent chat error', err)
+        this.replaceTyping(typingId, '抱歉，智能体暂时无法响应，请稍后重试。')
+      } finally {
+        this.loading = false
+      }
+    },
+    async sendConsultation(text) {
+      const attachment = this.pendingAttachment
+      this.loading = true
+      try {
+        if (attachment) {
+          const uploaded = await uploadConsultationAttachment(this.consultationId, attachment.path, {
+            messageType: attachment.type || 'FILE'
+          })
+          const uploadedMessage = this.mapConsultationMessage(uploaded)
+          uploadedMessage.self = true
+          this.appendLocalMessage(uploadedMessage)
+          this.pendingAttachment = null
+        }
+
+        if (text) {
+          const sent = await sendConsultationMessage(this.consultationId, {
+            messageType: 'TEXT',
+            textContent: text
+          })
+          const sentMessage = this.mapConsultationMessage(sent)
+          sentMessage.self = true
+          this.appendLocalMessage(sentMessage)
+        }
+
+        this.input = ''
+      } catch (err) {
+        console.error('send consultation message failed', err)
+      } finally {
+        this.loading = false
+      }
     },
     canStream() {
       return typeof fetch === 'function' && typeof ReadableStream !== 'undefined'
     },
-    async streamFromModel(text, agentId) {
+    async streamFromModel(text, typingId) {
       const token = getToken()
       const response = await fetch(resolveModelUrl('/api/agent/chat/stream'), {
         method: 'POST',
@@ -374,299 +526,78 @@ export default {
           buffer = buffer.slice(lineEnd + 1)
           if (line.startsWith('data:')) {
             let chunk = line.slice(5)
-            if (chunk.startsWith(' ')) {
-              chunk = chunk.slice(1)
-            }
-            if (chunk.endsWith('\r')) {
-              chunk = chunk.slice(0, -1)
-            }
+            if (chunk.startsWith(' ')) chunk = chunk.slice(1)
+            if (chunk.endsWith('\r')) chunk = chunk.slice(0, -1)
             if (chunk === '[DONE]') {
-              this.finalizeMessage(agentId, content)
+              this.replaceTyping(typingId, content)
               return
             }
-            if (chunk.startsWith('[ERROR]')) {
-              if (content.trim()) {
-                this.finalizeMessage(agentId, content)
-                return
-              }
-              throw new Error(chunk)
+            if (!chunk.startsWith('[ERROR]')) {
+              content += chunk
+              this.replaceTyping(typingId, content, true)
             }
-            content += chunk
-            this.updateMessage(agentId, this.normalizeMessageContent(content))
-            this.scrollTarget = agentId
-          } else if (line.length) {
-            const extra = line.endsWith('\r') ? line.slice(0, -1) : line
-            content += `\n${extra}`
-            this.updateMessage(agentId, this.normalizeMessageContent(content))
-            this.scrollTarget = agentId
           }
           lineEnd = buffer.indexOf('\n')
         }
       }
-      this.finalizeMessage(agentId, content)
+      this.replaceTyping(typingId, content)
     },
-    normalizeReply(payload) {
+    normalizeAgentReply(payload) {
       if (typeof payload === 'string') return payload
       if (payload && typeof payload.content === 'string') return payload.content
-      if (payload && payload.content && typeof payload.content === 'object') {
-        return JSON.stringify(payload.content, null, 2)
-      }
       if (payload && typeof payload.reply === 'string') return payload.reply
-      if (payload && payload.reply && typeof payload.reply === 'object') {
-        return JSON.stringify(payload.reply, null, 2)
-      }
       if (payload && typeof payload.message === 'string') return payload.message
-      if (payload && payload.message && typeof payload.message === 'object') {
-        return JSON.stringify(payload.message, null, 2)
-      }
+      if (payload && payload.content && typeof payload.content === 'object') return JSON.stringify(payload.content, null, 2)
+      if (payload && payload.reply && typeof payload.reply === 'object') return JSON.stringify(payload.reply, null, 2)
       return '已收到请求，但未返回有效内容。'
     },
-    getMessageBlocks(rawContent) {
-      const text = this.normalizeMessageContent(rawContent)
-      if (!text) return []
-      const lines = text.replace(/\r\n?/g, '\n').split('\n')
-      const blocks = []
-      let paragraph = []
-      let list = null
-      let code = []
-      let inCode = false
-
-      const flushParagraph = () => {
-        if (!paragraph.length) return
-        blocks.push({ type: 'paragraph', text: paragraph.join('\n') })
-        paragraph = []
-      }
-      const flushList = () => {
-        if (!list) return
-        blocks.push(list)
-        list = null
-      }
-      const flushCode = () => {
-        if (!code.length) return
-        blocks.push({ type: 'code', text: code.join('\n') })
-        code = []
-      }
-
-      lines.forEach((rawLine) => {
-        const line = rawLine.replace(/\s+$/, '')
-        if (line.trim().startsWith('```')) {
-          if (inCode) {
-            flushCode()
-            inCode = false
-          } else {
-            flushParagraph()
-            flushList()
-            inCode = true
-          }
-          return
-        }
-
-        if (inCode) {
-          code.push(rawLine)
-          return
-        }
-
-        if (!line.trim()) {
-          flushParagraph()
-          flushList()
-          return
-        }
-
-        const headingMatch = line.match(/^(#{1,6})\s+(.+)$/)
-        if (headingMatch) {
-          flushParagraph()
-          flushList()
-          blocks.push({ type: 'heading', level: headingMatch[1].length, text: headingMatch[2].trim() })
-          return
-        }
-
-        const labelHeading = line.match(/^(.{2,24})([:：])$/)
-        if (labelHeading) {
-          flushParagraph()
-          flushList()
-          blocks.push({ type: 'heading', level: 2, text: `${labelHeading[1]}${labelHeading[2]}` })
-          return
-        }
-
-        const sectionMatch = line.match(/^([A-E])\)\s+(.+)$/)
-        if (sectionMatch) {
-          flushParagraph()
-          flushList()
-          blocks.push({ type: 'heading', level: 2, text: `${sectionMatch[1]}) ${sectionMatch[2].trim()}` })
-          return
-        }
-
-        const listMatch = line.match(/^(\s*)([-*•]|\d+[.)])\s+(.+)$/)
-        if (listMatch) {
-          flushParagraph()
-          if (!list) {
-            list = { type: 'list', items: [] }
-          }
-          list.items.push({ marker: listMatch[2], text: listMatch[3].trim() })
-          return
-        }
-
-        paragraph.push(line)
+    appendTyping() {
+      const id = `typing-${Date.now()}-${Math.random().toString(16).slice(2)}`
+      this.messages.push({
+        id,
+        self: false,
+        type: 'typing',
+        content: '',
+        createdAt: ''
       })
-
-      if (inCode) {
-        flushCode()
-      } else {
-        flushParagraph()
-        flushList()
-      }
-
-      return blocks
+      this.scrollToBottom(id)
+      return id
     },
-    getInlineSegments(text) {
-      return this.parseInlineSegments(String(text || ''))
+    replaceTyping(id, content) {
+      const target = this.messages.find((message) => message.id === id)
+      if (!target) return
+      target.type = 'TEXT'
+      target.content = content || ' '
+      this.scrollToBottom(id)
     },
-    getInlineClass(type) {
-      if (type === 'bold') return 'msg-inline-bold'
-      if (type === 'italic') return 'msg-inline-italic'
-      if (type === 'code') return 'msg-inline-code'
-      return 'msg-inline-text'
+    appendLocalMessage(message) {
+      if (!message) return
+      this.messages.push(message)
+      this.scrollToBottom(message.id)
     },
-    parseInlineSegments(text) {
-      const segments = []
-      let lastIndex = 0
-      const codeRegex = /`([^`]+)`/g
-      let match
-      while ((match = codeRegex.exec(text))) {
-        const before = text.slice(lastIndex, match.index)
-        segments.push(...this.parseEmphasisSegments(before))
-        if (match[1]) {
-          segments.push({ type: 'code', text: match[1] })
+    scrollToBottom(id) {
+      this.$nextTick(() => {
+        const target = id || (this.messages.length ? this.messages[this.messages.length - 1].id : '')
+        if (target !== undefined && target !== null) {
+          this.scrollTarget = String(target)
         }
-        lastIndex = match.index + match[0].length
-      }
-      segments.push(...this.parseEmphasisSegments(text.slice(lastIndex)))
-      return segments.length ? segments : [{ type: 'text', text }]
+      })
     },
-    parseEmphasisSegments(text) {
-      const segments = []
-      let lastIndex = 0
-      const boldRegex = /\*\*([^*]+)\*\*/g
-      let match
-      while ((match = boldRegex.exec(text))) {
-        const before = text.slice(lastIndex, match.index)
-        segments.push(...this.parseItalicSegments(before))
-        if (match[1]) {
-          segments.push({ type: 'bold', text: match[1] })
-        }
-        lastIndex = match.index + match[0].length
-      }
-      segments.push(...this.parseItalicSegments(text.slice(lastIndex)))
-      return segments
+    extractFileName(path) {
+      if (!path) return ''
+      const normalized = String(path).replace(/\\/g, '/')
+      const arr = normalized.split('/')
+      return arr[arr.length - 1] || ''
     },
-    parseItalicSegments(text) {
-      const segments = []
-      let lastIndex = 0
-      const italicRegex = /\*([^*]+)\*/g
-      let match
-      while ((match = italicRegex.exec(text))) {
-        const before = text.slice(lastIndex, match.index)
-        if (before) segments.push(...this.parseLinkSegments(before))
-        if (match[1]) {
-          segments.push({ type: 'italic', text: match[1] })
-        }
-        lastIndex = match.index + match[0].length
-      }
-      const tail = text.slice(lastIndex)
-      if (tail) segments.push(...this.parseLinkSegments(tail))
-      return segments
+    detectAttachmentType(nameOrPath) {
+      const text = String(nameOrPath || '').toLowerCase()
+      const imageExt = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp']
+      const modelExt = ['.stl', '.obj', '.nrrd', '.mha', '.nii', '.nii.gz']
+      if (imageExt.some((ext) => text.endsWith(ext))) return 'IMAGE'
+      if (modelExt.some((ext) => text.endsWith(ext))) return 'MODEL'
+      return 'FILE'
     },
-    parseLinkSegments(text) {
-      const segments = []
-      let lastIndex = 0
-      const linkRegex = /(https?:\/\/[^\s)]+)(?=\s|$)/g
-      let match
-      while ((match = linkRegex.exec(text))) {
-        const before = text.slice(lastIndex, match.index)
-        if (before) segments.push({ type: 'text', text: before })
-        segments.push({ type: 'link', text: match[1], href: match[1] })
-        lastIndex = match.index + match[1].length
-      }
-      const tail = text.slice(lastIndex)
-      if (tail) segments.push({ type: 'text', text: tail })
-      return segments
-    },
-    normalizeMessageContent(rawContent) {
-      if (rawContent === null || rawContent === undefined) return ''
-      let text = ''
-      if (typeof rawContent === 'object') {
-        try {
-          text = JSON.stringify(rawContent, null, 2)
-        } catch (err) {
-          text = String(rawContent)
-        }
-      } else {
-        text = String(rawContent)
-      }
-      const trimmed = text.trim()
-      if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
-        try {
-          text = JSON.parse(trimmed)
-        } catch (err) {
-          text = text
-        }
-      }
-      if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
-        try {
-          const parsed = JSON.parse(trimmed)
-          const extracted = this.extractContentFromPayload(parsed)
-          if (typeof extracted === 'string' && extracted.trim()) {
-            text = extracted
-          } else {
-            text = JSON.stringify(parsed, null, 2)
-          }
-        } catch (err) {
-          text = text
-        }
-      }
-      if (text.includes('\\n') && !text.includes('\n')) {
-        text = text.replace(/\\n/g, '\n')
-      }
-      if (text.includes('\\t')) {
-        text = text.replace(/\\t/g, '    ')
-      }
-      if (text.includes('\\r') && !text.includes('\r')) {
-        text = text.replace(/\\r/g, '')
-      }
-      if (text.includes('\\*')) {
-        text = text.replace(/\\\*/g, '*')
-      }
-      if (text.includes('\\_')) {
-        text = text.replace(/\\_/g, '_')
-      }
-      text = text.replace(/\bdoc_id:\s*\S+/gi, '')
-      text = text.replace(/\bsource_uri:\s*\S+/gi, '')
-      text = text.replace(/\s{2,}/g, ' ')
-      text = text.replace(/(###\s*)/g, '\n$1')
-      text = text.replace(/([。！？])\s*(###)/g, '$1\n$2')
-      text = text.replace(/([。！？])\s*(-)/g, '$1\n-')
-      text = text.replace(/([。！？])\s*(\d+[.)])/g, '$1\n$2')
-      text = text.replace(/([。！？])\s*([A-E]\))/g, '$1\n$2')
-      text = text.replace(/([：:])\s*([-*•]|\d+[.)])/g, '$1\n$2')
-      return text
-    },
-    extractContentFromPayload(payload) {
-      if (!payload) return ''
-      if (typeof payload === 'string') return payload
-      if (Array.isArray(payload)) {
-        const last = payload[payload.length - 1]
-        return this.extractContentFromPayload(last)
-      }
-      if (typeof payload === 'object') {
-        const candidates = ['content', 'reply', 'message', 'text', 'output']
-        for (const key of candidates) {
-          if (typeof payload[key] === 'string') return payload[key]
-        }
-        if (payload.data) return this.extractContentFromPayload(payload.data)
-      }
-      return ''
-    },
-    openLink(url) {
+    openOssPath(url) {
       if (!url) return
       if (typeof plus !== 'undefined' && plus.runtime?.openURL) {
         plus.runtime.openURL(url)
@@ -682,6 +613,15 @@ export default {
           uni.showToast({ title: '链接已复制', icon: 'none' })
         }
       })
+    },
+    shortTime(value) {
+      if (!value) return ''
+      const text = String(value)
+      if (text.includes(' ')) {
+        const [date, time] = text.split(' ')
+        return `${date.slice(5)} ${time.slice(0, 5)}`
+      }
+      return text
     }
   }
 }
@@ -690,7 +630,7 @@ export default {
 <style scoped>
 .page {
   height: 100vh;
-  background: #f2f2f4;
+  background: #edf4ff;
   display: flex;
   flex-direction: column;
 }
@@ -699,9 +639,9 @@ export default {
   display: flex;
   align-items: center;
   gap: 14rpx;
-  padding: calc(12rpx + env(safe-area-inset-top)) 20rpx 12rpx;
-  background: #ffffff;
-  border-bottom: 1rpx solid #e6e7eb;
+  padding: calc(12rpx + env(safe-area-inset-top)) 22rpx 12rpx;
+  background: linear-gradient(155deg, #2f78d8 0%, #3888ee 44%, #62a6f4 100%);
+  box-shadow: 0 10rpx 28rpx rgba(42, 106, 188, 0.24);
 }
 
 .back {
@@ -711,53 +651,158 @@ export default {
   align-items: center;
   justify-content: center;
   border-radius: 30rpx;
-  background: #f3f4f6;
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
 }
 
 .header-avatar {
   width: 60rpx;
   height: 60rpx;
   border-radius: 18rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.4);
 }
 
 .header-info {
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 4rpx;
+  min-width: 0;
 }
 
 .header-name {
   font-size: 28rpx;
-  font-weight: 600;
-  color: #0c0d0f;
+  font-weight: 700;
+  color: #ffffff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .header-status {
   font-size: 22rpx;
-  color: #12a150;
+  color: rgba(255, 255, 255, 0.84);
+}
+
+.member-entry {
+  padding: 8rpx 14rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  color: #ffffff;
+  border: 1rpx solid rgba(255, 255, 255, 0.4);
+}
+
+.context-strip {
+  padding: 12rpx 20rpx 10rpx;
+  display: flex;
+  gap: 10rpx;
+  background: #edf4ff;
+}
+
+.context-chip {
+  padding: 8rpx 14rpx;
+  border-radius: 999rpx;
+  border: 1rpx solid #c6dbf5;
+  background: #f5f9ff;
+  color: #2f5f97;
+  font-size: 22rpx;
+}
+
+.member-panel {
+  margin: 0 20rpx 10rpx;
+  padding: 14rpx;
+  border-radius: 18rpx;
+  border: 1rpx solid #d6e5f7;
+  background: #ffffff;
+  box-shadow: 0 10rpx 24rpx rgba(47, 105, 182, 0.1);
+}
+
+.member-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.member-panel-head--sub {
+  margin-top: 10rpx;
+}
+
+.member-panel-title {
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #173a64;
+}
+
+.member-panel-action {
+  font-size: 22rpx;
+  color: #2f78d8;
+}
+
+.member-list,
+.friend-list {
+  margin-top: 8rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.member-item,
+.friend-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8rpx;
+  border: 1rpx solid #e1ecfa;
+  border-radius: 14rpx;
+  background: #f8fbff;
+  padding: 10rpx 12rpx;
+}
+
+.member-name,
+.friend-name {
+  display: block;
+  font-size: 24rpx;
+  font-weight: 650;
+  color: #173a64;
+}
+
+.member-meta,
+.friend-meta {
+  display: block;
+  margin-top: 4rpx;
+  font-size: 20rpx;
+  color: #7893b3;
+}
+
+.member-remove {
+  color: #c14c4c;
+  font-size: 22rpx;
+}
+
+.friend-add {
+  color: #2f78d8;
+  font-size: 22rpx;
 }
 
 .message-list {
   flex: 1;
   min-height: 0;
-  padding: 16rpx 20rpx 4rpx;
-  display: flex;
-  flex-direction: column;
+  padding: 12rpx 20rpx 8rpx;
 }
 
 .message {
   display: flex;
   align-items: flex-start;
   gap: 16rpx;
-  max-width: 92%;
+  max-width: 94%;
 }
 
 .message + .message {
-  margin-top: 28rpx;
+  margin-top: 22rpx;
 }
 
 .message.user {
-  align-self: flex-end;
+  margin-left: auto;
   flex-direction: row-reverse;
 }
 
@@ -765,37 +810,98 @@ export default {
   width: 64rpx;
   height: 64rpx;
   border-radius: 18rpx;
-  background: #e6e7eb;
+  background: #d6e5f7;
   flex-shrink: 0;
+  border: 1rpx solid #cde0f7;
+}
+
+.bubble-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6rpx;
+  max-width: 74%;
+}
+
+.message.user .bubble-wrap {
+  align-items: flex-end;
 }
 
 .bubble {
-  padding: 18rpx 20rpx;
-  border-radius: 18rpx;
+  padding: 16rpx 18rpx;
+  border-radius: 20rpx;
   background: #ffffff;
-  border: 1rpx solid #e6e7eb;
+  border: 1rpx solid #d6e5f7;
+  box-shadow: 0 10rpx 24rpx rgba(47, 105, 182, 0.1);
   line-height: 1.5;
   font-size: 26rpx;
-  color: #202124;
-  max-width: 72%;
+  color: #203854;
   word-break: break-word;
-  margin-top: 8rpx;
   display: flex;
   flex-direction: column;
-  gap: 12rpx;
+  gap: 10rpx;
+}
+
+.bubble.user {
+  background: linear-gradient(140deg, #2f78d8 0%, #4a95ec 100%);
+  border-color: transparent;
+  color: #ffffff;
+  box-shadow: 0 12rpx 24rpx rgba(47, 120, 216, 0.3);
+}
+
+.sender-name {
+  font-size: 22rpx;
+  color: #6b85a5;
+}
+
+.msg-text {
+  font-size: 26rpx;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  color: inherit;
 }
 
 .message-image {
   width: 320rpx;
   height: 200rpx;
   border-radius: 16rpx;
-  background: #f3f4f6;
+  background: #edf4ff;
 }
 
-.message.user .bubble {
-  background: #8bd16b;
-  border-color: #8bd16b;
-  color: #0c0d0f;
+.file-box {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  border: 1rpx solid #d6e5f7;
+  background: #f4f8ff;
+  border-radius: 12rpx;
+  padding: 10rpx;
+}
+
+.file-meta {
+  min-width: 0;
+  flex: 1;
+}
+
+.file-name {
+  display: block;
+  font-size: 24rpx;
+  color: #173a64;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-sub {
+  display: block;
+  margin-top: 2rpx;
+  font-size: 20rpx;
+  color: #7492b3;
+}
+
+.msg-time {
+  font-size: 20rpx;
+  color: #88a0be;
 }
 
 .typing {
@@ -809,7 +915,7 @@ export default {
   width: 10rpx;
   height: 10rpx;
   border-radius: 999rpx;
-  background: #9aa0a6;
+  background: #8aa0bd;
   animation: typingPulse 1.2s infinite ease-in-out;
 }
 
@@ -834,82 +940,46 @@ export default {
   }
 }
 
-.block {
+.input-preview {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12rpx;
+  padding: 10rpx 20rpx;
+  background: #ffffff;
+  border-top: 1rpx solid #d6e5f7;
+}
+
+.preview-main {
+  display: flex;
+  align-items: center;
   gap: 10rpx;
-}
-
-.msg-heading {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: #0c0d0f;
-}
-
-.msg-paragraph {
-  font-size: 26rpx;
-  color: inherit;
-  white-space: pre-line;
-}
-
-.msg-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8rpx;
-}
-
-.msg-list-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 10rpx;
-}
-
-.msg-list-bullet {
-  font-weight: 600;
-  color: inherit;
-  line-height: 1.5;
-}
-
-.msg-list-text {
+  min-width: 0;
   flex: 1;
-  white-space: pre-line;
-  line-height: 1.5;
 }
 
-.msg-code {
-  font-family: "SFMono-Regular", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+.preview-meta {
+  min-width: 0;
+  flex: 1;
+}
+
+.preview-label {
+  display: block;
+  font-size: 22rpx;
+  color: #627d9f;
+}
+
+.preview-name {
+  display: block;
   font-size: 24rpx;
-  background: #f3f4f6;
-  border-radius: 12rpx;
-  padding: 12rpx 14rpx;
-  white-space: pre-wrap;
+  color: #0c0d0f;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.msg-inline-text {
-  color: inherit;
-}
-
-.msg-inline-bold {
-  font-weight: 700;
-  color: inherit;
-}
-
-.msg-inline-italic {
-  font-style: italic;
-  color: inherit;
-}
-
-.msg-inline-code {
-  font-family: "SFMono-Regular", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
-  font-size: 24rpx;
-  background: #eef1f6;
-  border-radius: 8rpx;
-  padding: 2rpx 6rpx;
-}
-
-.msg-link {
-  color: #1a5ed7;
-  text-decoration: underline;
+.preview-remove {
+  color: #627d9f;
 }
 
 .input-bar {
@@ -918,7 +988,8 @@ export default {
   gap: 12rpx;
   padding: 12rpx 20rpx calc(12rpx + env(safe-area-inset-bottom));
   background: #ffffff;
-  border-top: 1rpx solid #e6e7eb;
+  border-top: 1rpx solid #d6e5f7;
+  box-shadow: 0 -8rpx 26rpx rgba(47, 105, 182, 0.08);
 }
 
 .image-picker {
@@ -928,52 +999,20 @@ export default {
   align-items: center;
   justify-content: center;
   border-radius: 14rpx;
-  border: 1rpx solid #e6e7eb;
-  background: #ffffff;
-  color: #0c0d0f;
+  border: 1rpx solid #d6e5f7;
+  background: #f4f8ff;
+  color: #2f78d8;
 }
 
-.input-preview {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  padding: 10rpx 20rpx;
-  background: #ffffff;
-  border-top: 1rpx solid #e6e7eb;
-}
-
-.preview-image {
-  width: 80rpx;
-  height: 80rpx;
-  border-radius: 14rpx;
-  background: #f3f4f6;
-}
-
-.preview-meta {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 4rpx;
-}
-
-.preview-label {
-  font-size: 24rpx;
-  color: #6a6f78;
-}
-
-.preview-name {
-  font-size: 24rpx;
-  color: #0c0d0f;
-}
-
-.preview-remove {
-  color: #6a6f78;
+.send-btn {
+  min-width: 106rpx;
 }
 
 :deep(.wd-input) {
   flex: 1;
   min-height: 72rpx;
-  background: #f3f4f6;
-  border-radius: 12rpx;
+  background: #f4f8ff;
+  border-radius: 14rpx;
+  border: 1rpx solid #d6e5f7;
 }
 </style>

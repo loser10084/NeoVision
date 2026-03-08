@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <view class="page">
     <view class="safe-area">
       <view class="card form-card">
@@ -23,11 +23,11 @@
           </view>
           <view class="field">
             <text class="field-label">分期</text>
-            <wd-input v-model="form.stage" prop="stage" placeholder="如 T3N2M0" clearable />
+            <wd-input v-model="form.stage" prop="stage" placeholder="如：T3N2M0" clearable />
           </view>
           <view class="field">
             <text class="field-label">诊断</text>
-            <wd-input v-model="form.diagnosis" prop="diagnosis" placeholder="如 鼻咽癌" clearable />
+            <wd-input v-model="form.diagnosis" prop="diagnosis" placeholder="如：鼻咽癌" clearable />
           </view>
           <view class="field">
             <text class="field-label">影像号</text>
@@ -132,12 +132,12 @@ export default {
 <style scoped>
 .page {
   min-height: 100vh;
-  background: #f7f7f8;
+  background: #edf4ff;
 }
 
 .form-card {
   background: rgba(255, 255, 255, 0.96);
-  border: 1rpx solid #e6e7eb;
+  border: 1rpx solid #d6e5f7;
   border-radius: 32rpx;
   box-shadow: 0 26rpx 70rpx rgba(0, 0, 0, 0.05);
   display: flex;
@@ -178,7 +178,7 @@ export default {
 }
 
 .ghost-btn {
-  border: 1rpx solid #d8dade;
+  border: 1rpx solid #cfddf2;
   color: #0c0d0f;
   background: #ffffff;
   border-radius: 999rpx;
@@ -206,7 +206,7 @@ export default {
 :deep(.wd-input) {
   flex: 1;
   height: 80rpx;
-  border: 1rpx solid #dee0e5;
+  border: 1rpx solid #d0def2;
   border-radius: 18rpx;
   padding: 0 16rpx;
   background: #ffffff;
@@ -222,5 +222,10 @@ export default {
 
 :deep(.wd-input__clear) {
   line-height: 80rpx;
+}
+
+.subtle {
+  font-size: 24rpx;
+  color: #6f85a4;
 }
 </style>

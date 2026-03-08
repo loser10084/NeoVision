@@ -1,13 +1,23 @@
-﻿<template>
+<template>
   <view class="page login">
-    <view class="bg-blur bg-blur--left"></view>
-    <view class="bg-blur bg-blur--right"></view>
+    <view class="hero">
+      <view class="safe-area hero-inner">
+        <view class="hero-top">
+          <view>
+            <text class="hero-title">智影医生端</text>
+            <text class="hero-subtitle">放疗影像智能勾画协作平台</text>
+          </view>
+          <image class="hero-logo" src="/static/project_icon.jpg" mode="aspectFill" />
+        </view>
+        <view class="hero-chips">
+          <text class="hero-chip">影像管理</text>
+          <text class="hero-chip">AI勾画</text>
+          <text class="hero-chip">医生复核</text>
+        </view>
+      </view>
+    </view>
 
     <view class="safe-area content">
-      <view class="header">
-        <image class="brand-logo" src="/static/project_icon.jpg" mode="aspectFit" />
-      </view>
-
       <view class="card form-card">
         <view class="form-head">
           <view>
@@ -126,77 +136,80 @@ export default {
 <style scoped>
 .page {
   min-height: 100vh;
-  background: #fefeff;
-  position: relative;
-  overflow: hidden;
-  color: #0c0d0f;
+  background: #edf4ff;
 }
 
-.bg-blur {
-  position: absolute;
-  width: 420rpx;
-  height: 420rpx;
-  border-radius: 50%;
-  filter: blur(68rpx);
-  opacity: 0.16;
-  background: radial-gradient(circle at 30% 30%, #ffffff, #e9eaed);
+.hero {
+  background: linear-gradient(155deg, #2f78d8 0%, #3888ee 44%, #62a6f4 100%);
+  border-bottom-left-radius: 30rpx;
+  border-bottom-right-radius: 30rpx;
+  box-shadow: 0 16rpx 44rpx rgba(42, 106, 188, 0.3);
 }
 
-.bg-blur--left {
-  top: -120rpx;
-  left: -80rpx;
+.hero-inner {
+  padding-top: calc(24rpx + env(safe-area-inset-top));
+  padding-bottom: 20rpx;
 }
 
-.bg-blur--right {
-  bottom: -140rpx;
-  right: -120rpx;
-  background: radial-gradient(circle at 70% 40%, #f1f2f5, #e4e6ea);
+.hero-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+}
+
+.hero-title {
+  display: block;
+  font-size: 50rpx;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.hero-subtitle {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 26rpx;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.hero-logo {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 24rpx;
+  border: 2rpx solid rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.hero-chips {
+  margin-top: 16rpx;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.hero-chip {
+  padding: 10rpx 18rpx;
+  border-radius: 999rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.36);
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  font-size: 22rpx;
 }
 
 .content {
-  position: relative;
-  z-index: 1;
+  margin-top: 18rpx;
   display: flex;
   flex-direction: column;
-  gap: 34rpx;
-}
-
-.header {
-  margin: 12rpx 0 10rpx;
-  display: flex;
-  flex-direction: column;
-  gap: 10rpx;
-  align-items: center;
-}
-
-.brand-logo {
-  width: 160rpx;
-  height: 160rpx;
-  border-radius: 32rpx;
-  background: #fefeff;
-}
-
-.title {
-  font-size: 60rpx;
-  font-weight: 750;
-  letter-spacing: 0.3rpx;
-}
-
-.subtitle {
-  font-size: 30rpx;
-  color: #4f545c;
-  line-height: 1.6;
 }
 
 .form-card {
-  margin-top: 6rpx;
-  background: transparent;
-  border: none;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1rpx solid #d6e5f7;
   border-radius: 32rpx;
-  box-shadow: none;
+  box-shadow: 0 26rpx 68rpx rgba(43, 104, 186, 0.16);
   display: flex;
   flex-direction: column;
-  gap: 16rpx;
+  gap: 18rpx;
   padding: 30rpx 26rpx 26rpx;
 }
 
@@ -213,17 +226,17 @@ export default {
 }
 
 .hint {
-  color: #6a6f78;
+  color: #627d9f;
   font-size: 26rpx;
 }
 
 .pill {
   padding: 12rpx 18rpx;
   border-radius: 999rpx;
-  background: #f3f4f6;
-  color: #0c0d0f;
-  font-size: 26rpx;
-  border: 1rpx solid #e6e7eb;
+  background: #eef5ff;
+  color: #245eac;
+  font-size: 24rpx;
+  border: 1rpx solid #c8dcf6;
 }
 
 .action-bar {
@@ -238,31 +251,26 @@ export default {
 }
 
 .primary-btn {
-  background: #ffffff;
-  color: #0f1012;
-  border: 1rpx solid #0f1012;
-  box-shadow: none;
-  border-radius: 999rpx;
+  box-shadow: 0 12rpx 30rpx rgba(47, 120, 216, 0.28);
 }
 
 .ghost-btn {
-  border: 1rpx solid #d8dade;
-  color: #0c0d0f;
+  border: 1rpx solid #c8daf4;
+  color: #2f4f73;
   background: #ffffff;
-  border-radius: 999rpx;
+  box-shadow: 0 8rpx 20rpx rgba(47, 120, 216, 0.12);
 }
 
 .field {
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-  padding: 8rpx 6rpx;
+  display: block;
+  padding: 4rpx 2rpx;
 }
 
 .field-label {
-  width: 120rpx;
-  font-size: 28rpx;
-  color: #111318;
+  display: block;
+  margin-bottom: 8rpx;
+  font-size: 26rpx;
+  color: #2f4f73;
 }
 
 :deep(.wd-form) {
@@ -274,10 +282,10 @@ export default {
 :deep(.wd-input) {
   flex: 1;
   height: 80rpx;
-  border: 1rpx solid #dee0e5;
+  border: 1rpx solid #cfe0f6;
   border-radius: 18rpx;
-  padding: 0 16rpx;
-  background: #ffffff;
+  padding: 0 18rpx;
+  background: #f8fbff;
   color: #0c0d0f;
   box-sizing: border-box;
 }

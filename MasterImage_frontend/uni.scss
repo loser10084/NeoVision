@@ -1,63 +1,52 @@
-/**
+﻿/**
  * Global uni-app theme variables
- * White background + black text for a clean medical-facing UI.
+ * Light blue medical theme tokens.
  */
 
-/* Action colors - 黑白基调下的低饱和度色彩 */
-$uni-color-primary: #0f1012;
-$uni-color-success: #1f8b4c;
-$uni-color-warning: #c68a15;
-$uni-color-error: #d64b4b;
+$uni-color-primary: #2f78d8;
+$uni-color-success: #2b9b62;
+$uni-color-warning: #c58b2f;
+$uni-color-error: #d45c5c;
 
-/* Text colors */
-$uni-text-color: #111318; // base
-$uni-text-color-inverse: #ffffff; // inverse
-$uni-text-color-grey: #6b7075; // secondary
-$uni-text-color-placeholder: #a8acb3;
-$uni-text-color-disable: #c0c4cc;
+$uni-text-color: #143356;
+$uni-text-color-inverse: #ffffff;
+$uni-text-color-grey: #5f7ea3;
+$uni-text-color-placeholder: #91a7c2;
+$uni-text-color-disable: #b9c8db;
 
-/* Background colors */
-$uni-bg-color: #f7f7f8;
-$uni-bg-color-grey: #f2f3f5;
-$uni-bg-color-hover: #edeef0;
-$uni-bg-color-mask: rgba(0, 0, 0, 0.45);
+$uni-bg-color: #edf4ff;
+$uni-bg-color-grey: #f4f8ff;
+$uni-bg-color-hover: #e8f1ff;
+$uni-bg-color-mask: rgba(22, 54, 93, 0.42);
 
-/* Border color */
-$uni-border-color: #e6e7eb;
+$uni-border-color: #d6e5f7;
 
-/* Font sizes */
 $uni-font-size-sm: 12px;
 $uni-font-size-base: 14px;
 $uni-font-size-lg: 16px;
 
-/* Image sizes */
 $uni-img-size-sm: 20px;
 $uni-img-size-base: 26px;
 $uni-img-size-lg: 40px;
 
-/* Border Radius */
-$uni-border-radius-sm: 2px;
-$uni-border-radius-base: 3px;
-$uni-border-radius-lg: 6px;
+$uni-border-radius-sm: 4px;
+$uni-border-radius-base: 8px;
+$uni-border-radius-lg: 14px;
 $uni-border-radius-circle: 50%;
 
-/* Horizontal spacing */
 $uni-spacing-row-sm: 5px;
 $uni-spacing-row-base: 10px;
 $uni-spacing-row-lg: 15px;
 
-/* Vertical spacing */
 $uni-spacing-col-sm: 4px;
 $uni-spacing-col-base: 8px;
 $uni-spacing-col-lg: 12px;
 
-/* Disabled opacity */
 $uni-opacity-disabled: 0.3;
 
-/* Article styles */
-$uni-color-title: #0b0c0f;
+$uni-color-title: #143356;
 $uni-font-size-title: 20px;
-$uni-color-subtitle: #44484f;
+$uni-color-subtitle: #355a84;
 $uni-font-size-subtitle: 26px;
-$uni-color-paragraph: #3f4752;
+$uni-color-paragraph: #3f648d;
 $uni-font-size-paragraph: 15px;

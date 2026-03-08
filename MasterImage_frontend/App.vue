@@ -7,48 +7,83 @@ export default {
 </script>
 
 <style>
-  /* 全局黑白极简基调，贴近 iOS 医疗工具的清爽气质 */
   page {
-    background-color: #f7f7f8;
-    color: #0c0d0f;
-    font-family: "SF Pro Display", "SF Pro Text", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
-    letter-spacing: 0.15rpx;
+    --mi-primary: #2f78d8;
+    --mi-primary-strong: #245eac;
+    --mi-primary-soft: #eaf3ff;
+    --mi-text-main: #143356;
+    --mi-text-regular: #2f4f73;
+    --mi-text-muted: #6a84a6;
+    --mi-bg: #edf4ff;
+    --mi-bg-soft: #f5f9ff;
+    --mi-surface: #ffffff;
+    --mi-border: #d6e5f7;
+    --mi-border-strong: #bfd5ef;
+    --mi-shadow: 0 20rpx 56rpx rgba(45, 113, 194, 0.1);
+    --mi-radius-card: 28rpx;
+    --mi-radius-field: 18rpx;
+    --mi-radius-pill: 999rpx;
+    background:
+      radial-gradient(700rpx 360rpx at -8% -4%, rgba(136, 186, 255, 0.22), transparent 68%),
+      radial-gradient(560rpx 300rpx at 106% 3%, rgba(168, 207, 255, 0.2), transparent 64%),
+      linear-gradient(180deg, #f4f8ff 0%, #edf4ff 34%, #e9f2ff 100%);
+    background-color: var(--mi-bg);
+    color: var(--mi-text-main);
+    font-family: "Avenir Next", "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    letter-spacing: 0.1rpx;
     -webkit-font-smoothing: antialiased;
   }
 
+  .page {
+    min-height: 100vh;
+    color: var(--mi-text-main);
+  }
+
   .safe-area {
-    padding: 34rpx 30rpx 26rpx;
+    padding: 34rpx 30rpx 28rpx;
   }
 
   .card {
     background: #ffffff;
-    border: 1rpx solid #e6e7eb;
-    border-radius: 28rpx;
+    border: 1rpx solid var(--mi-border);
+    border-radius: var(--mi-radius-card);
     padding: 30rpx;
-    box-shadow: 0 22rpx 60rpx rgba(0, 0, 0, 0.04);
+    box-shadow: var(--mi-shadow);
+    backdrop-filter: blur(2rpx);
   }
 
   .section-title {
     font-size: 34rpx;
     font-weight: 650;
-    letter-spacing: 0.4rpx;
+    letter-spacing: 0.2rpx;
     margin-bottom: 18rpx;
-    color: #0c0d0f;
+    color: var(--mi-text-main);
   }
 
   .subtle {
-    color: #5e616a;
+    color: var(--mi-text-muted);
   }
 
   .action-bar {
     display: flex;
     gap: 16rpx;
     margin-top: 18rpx;
+    justify-content: space-between;
+    align-items: stretch;
+  }
+
+  .action-bar:not(.column) > * {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .action-bar.column > * {
+    width: 100%;
   }
 
   .divider {
     height: 1rpx;
-    background: linear-gradient(90deg, transparent, #e6e7eb, transparent);
+    background: linear-gradient(90deg, transparent, var(--mi-border-strong), transparent);
     margin: 24rpx 0;
   }
 
@@ -57,38 +92,48 @@ export default {
     align-items: center;
     gap: 10rpx;
     padding: 14rpx 20rpx;
-    border-radius: 999rpx;
-    background: #f3f4f6;
-    color: #0c0d0f;
-    border: 1rpx solid #e6e7eb;
+    border-radius: var(--mi-radius-pill);
+    background: var(--mi-primary-soft);
+    color: var(--mi-primary-strong);
+    border: 1rpx solid var(--mi-border);
+  }
+  .mi-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    box-sizing: border-box;
   }
 
   .eyebrow {
     font-size: 26rpx;
-    color: #6a6f78;
-    letter-spacing: 0.6rpx;
+    color: var(--mi-text-muted);
+    letter-spacing: 0.5rpx;
     text-transform: uppercase;
   }
 
-  /* Wot Design 组件的全局极简黑白风覆盖 */
+  :deep(.wd-button) {
+    border-radius: 999rpx;
+  }
+
   :deep(.wd-button--primary) {
-    background: #ffffff;
-    border-color: #0f1012;
-    color: #0f1012;
-    box-shadow: none;
+    background: linear-gradient(135deg, var(--mi-primary) 0%, var(--mi-primary-strong) 100%);
+    border-color: transparent;
+    color: #ffffff;
+    box-shadow: 0 10rpx 28rpx rgba(47, 120, 216, 0.28);
   }
 
   :deep(.wd-button--primary.is-plain) {
-    background: #ffffff;
-    color: #0f1012;
-    border-color: #0f1012;
+    background: var(--mi-primary-soft);
+    color: var(--mi-primary-strong);
+    border-color: var(--mi-border-strong);
     box-shadow: none;
   }
 
   :deep(.wd-button--default.is-plain) {
     background: #ffffff;
-    color: #0c0d0f;
-    border-color: #d8dade;
+    color: var(--mi-text-regular);
+    border-color: var(--mi-border);
   }
 
   :deep(.wd-tag) {
@@ -97,33 +142,33 @@ export default {
   }
 
   :deep(.wd-tag--plain.wd-tag--primary) {
-    color: #0f1012;
-    border-color: #0f1012;
-    background: #ffffff;
+    color: var(--mi-primary-strong);
+    border-color: var(--mi-border-strong);
+    background: var(--mi-primary-soft);
   }
 
   :deep(.wd-tag--plain.wd-tag--success) {
     color: #1f8b4c;
-    border-color: #1f8b4c;
-    background: #ffffff;
+    border-color: #bce2cb;
+    background: #f3fbf6;
   }
 
   :deep(.wd-tag--plain.wd-tag--warning) {
-    color: #c68a15;
-    border-color: #c68a15;
-    background: #ffffff;
+    color: #b27613;
+    border-color: #f2dfbe;
+    background: #fdf8ef;
   }
 
   :deep(.wd-tag--plain.wd-tag--info) {
-    color: #5e616a;
-    border-color: #d8dade;
-    background: #ffffff;
+    color: var(--mi-text-muted);
+    border-color: var(--mi-border);
+    background: #f8fbff;
   }
 
   :deep(.wd-search) {
     background: #ffffff;
     border-radius: 999rpx;
-    border: 1rpx solid #e6e7eb;
+    border: 1rpx solid var(--mi-border);
     padding: 4rpx 8rpx;
   }
 
@@ -132,29 +177,29 @@ export default {
   }
 
   :deep(.wd-cell) {
-    background: #ffffff;
+    background: transparent;
   }
 
   :deep(.wd-cell__title) {
-    color: #0c0d0f;
+    color: var(--mi-text-main);
     font-weight: 600;
   }
 
   :deep(.wd-cell__label) {
-    color: #6a6f78;
+    color: var(--mi-text-muted);
   }
 
   :deep(.wd-form-item__label) {
-    color: #111318;
+    color: var(--mi-text-main);
     font-weight: 600;
   }
 
   :deep(.wd-input) {
     background: #ffffff;
-    border: 1rpx solid #dee0e5;
-    border-radius: 18rpx;
+    border: 1rpx solid var(--mi-border);
+    border-radius: var(--mi-radius-field);
     padding: 0 16rpx;
-    color: #0c0d0f;
+    color: var(--mi-text-main);
     min-height: 80rpx;
     display: flex;
     align-items: center;
@@ -168,7 +213,6 @@ export default {
     padding: 0;
   }
 
-  /* 保留校验提示空间，避免输入框被顶开 */
   :deep(.wd-form-item__message) {
     min-height: 32rpx;
     margin-top: 6rpx;
@@ -176,7 +220,6 @@ export default {
     display: block;
   }
 
-  /* 给每个表单项额外底部留白，错误提示不会挤压输入框 */
   :deep(.wd-form-item) {
     margin-bottom: 12rpx;
   }
@@ -185,3 +228,4 @@ export default {
     align-items: center;
   }
 </style>
+

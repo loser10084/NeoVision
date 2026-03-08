@@ -1,73 +1,96 @@
 <template>
   <view class="page">
-    <view class="safe-area">
-      <view class="card">
-        <view class="section-title">已上传模态</view>
-        <view class="study-modalities">
-          <view v-for="modality in modalityOrder" :key="modality" class="modality-item">
-            <text class="label">{{ modalityLabel(modality) }}</text>
-            <wd-tag plain :type="modalityTagType(activeStudyId, modality)">
-              {{ modalityTagText(activeStudyId, modality) }}
-            </wd-tag>
+    <view class="safe-area ctv-area">
+      <view class="ctv-hero">
+        <view class="hero-main">
+          <view>
+            <text class="hero-title">CTV 精修工作台</text>
+            <text class="hero-subtitle">在外扩结果基础上完成精修分割与结果校核</text>
           </view>
+          <view class="hero-badge">AI</view>
         </view>
-        <view class="action-row">
-          <wd-button size="small" shape="round" type="default" plain @click="openStudyPicker">
-            选择序列
-          </wd-button>
-          <text class="subtle">当前序列：{{ activeStudyId || '-' }}</text>
+        <view class="hero-metrics">
+          <view class="metric-item">
+            <text class="metric-value">{{ activeStudyId || '-' }}</text>
+            <text class="metric-label">当前序列</text>
+          </view>
+          <view class="metric-item">
+            <text class="metric-value">{{ readyModalityCount }}/{{ modalityOrder.length }}</text>
+            <text class="metric-label">模态就绪</text>
+          </view>
+          <view class="metric-item">
+            <text class="metric-value">{{ refinedLabelStatusText }}</text>
+            <text class="metric-label">精修 Label</text>
+          </view>
         </view>
       </view>
 
-      <view class="card">
-        <view class="section-title">CTV 精修</view>
+      <view class="card block-card">
+        <view class="section-header section-header--edge">
+          <text class="section-title">序列与模态检查</text>
+          <button class="mi-btn mi-btn--ghost" @click="openStudyPicker">切换序列</button>
+        </view>
+        <view class="study-modalities">
+          <view v-for="modality in modalityOrder" :key="modality" class="modality-item">
+            <view class="modality-left">
+              <view class="modality-dot"></view>
+              <text class="label">{{ modalityLabel(modality) }}</text>
+            </view>
+            <text class="status-pill" :class="`status-pill--${modalityTagType(activeStudyId, modality)}`">
+              {{ modalityTagText(activeStudyId, modality) }}
+            </text>
+          </view>
+        </view>
+        <view class="hint-bar">
+          <text class="subtle">先确认 CTV 外扩 Label 已生成，再执行精修分割并下载结果。</text>
+        </view>
+      </view>
+
+      <view class="card block-card">
+        <view class="section-header">
+          <text class="section-title">精修执行</text>
+          <text class="status-pill" :class="`status-pill--${refinedLabelStatusType}`">{{ refinedLabelStatusText }}</text>
+        </view>
+
+        <view class="workflow-strip">
+          <view class="flow-step">
+            <text class="flow-index">1</text>
+            <text class="flow-text">确认外扩 Label</text>
+          </view>
+          <view class="flow-link"></view>
+          <view class="flow-step">
+            <text class="flow-index">2</text>
+            <text class="flow-text">执行精修分割</text>
+          </view>
+          <view class="flow-link"></view>
+          <view class="flow-step">
+            <text class="flow-index">3</text>
+            <text class="flow-text">下载精修结果</text>
+          </view>
+        </view>
+
         <view class="segment-status">
           <text class="label">外扩 Label</text>
-          <wd-tag plain :type="expandLabelFile ? 'success' : 'warning'">
+          <text class="status-pill" :class="expandLabelFile ? 'status-pill--success' : 'status-pill--warning'">
             {{ expandLabelFile ? '已生成' : '未生成' }}
-          </wd-tag>
+          </text>
         </view>
         <view class="segment-status">
           <text class="label">精修 Label</text>
-          <wd-tag plain :type="refinedLabelStatusType">
-            {{ refinedLabelStatusText }}
-          </wd-tag>
+          <text class="status-pill" :class="`status-pill--${refinedLabelStatusType}`">{{ refinedLabelStatusText }}</text>
         </view>
+
         <view class="segment-actions">
-          <wd-button
-            size="small"
-            shape="round"
-            type="primary"
-            plain
-            :loading="processing"
-            :disabled="processing"
-            @click="downloadRefinedLabel"
-          >
-            下载精修 Label
-          </wd-button>
-          <wd-button
-            size="small"
-            shape="round"
-            type="default"
-            plain
-            :loading="processing"
-            :disabled="processing || !canSubmit"
-            @click="submitExpand"
-          >
-            开始分割
-          </wd-button>
+          <button class="mi-btn mi-btn--primary" :disabled="processing" @click="downloadRefinedLabel">
+            {{ processing ? '处理中...' : '下载精修 Label' }}
+          </button>
+          <button class="mi-btn mi-btn--ghost" :disabled="processing || !canSubmit" @click="submitExpand">
+            开始精修分割
+          </button>
         </view>
       </view>
     </view>
   </view>
-
-  <wd-action-sheet
-    v-model="studyPickerVisible"
-    title="选择序列"
-    cancel-text="关闭"
-    :actions="studyPickerActions"
-    @select="handleStudyPick"
-  />
 </template>
 
 <script>
@@ -84,13 +107,15 @@ export default {
       refinedLabelMap: {},
       expandLabelMap: {},
       modalityOrder: ['flair', 't1', 't1c', 't2'],
-      studyPickerVisible: false,
-      studyPickerActions: [],
       processing: false,
       isH5: false
     }
   },
   computed: {
+    readyModalityCount() {
+      if (!this.activeStudyId) return 0
+      return this.modalityOrder.reduce((count, modality) => count + (this.getModalityFile(this.activeStudyId, modality) ? 1 : 0), 0)
+    },
     hasAllModalities() {
       return this.modalityOrder.every((m) => !!this.getModalityFile(this.activeStudyId, m))
     },
@@ -98,8 +123,8 @@ export default {
       return this.expandLabelMap?.[this.activeStudyId] || null
     },
     refinedLabelStatusText() {
-      if (!this.refinedLabelFile) return '\u672a\u751f\u6210'
-      return '\u5df2\u751f\u6210'
+      if (!this.refinedLabelFile) return '未生成'
+      return '已生成'
     },
     refinedLabelStatusType() {
       return this.refinedLabelFile ? 'success' : 'warning'
@@ -190,24 +215,21 @@ export default {
         if (!this.activeStudyId && this.studies[0]?.id) {
           this.activeStudyId = this.studies[0].id
         }
-        this.buildStudyPicker()
       } catch (err) {
         console.error('getStudies error', err)
       }
     },
-    buildStudyPicker() {
-      this.studyPickerActions = (this.studies || []).map((study) => ({
-        name: `序列 ${study.id}`,
-        id: study.id
-      }))
-    },
     openStudyPicker() {
       if (!this.studies.length) return
-      this.studyPickerVisible = true
-    },
-    async handleStudyPick({ item }) {
-      if (!item?.id) return
-      this.activeStudyId = item.id
+      const itemList = this.studies.map((study) => `序列 ${study.id}`)
+      uni.showActionSheet({
+        itemList,
+        success: ({ tapIndex }) => {
+          const study = this.studies[tapIndex]
+          if (!study?.id) return
+          this.activeStudyId = study.id
+        }
+      })
     },
     normalizeRefinedLabel(label, fallbackSource = 'upload') {
       if (!label) return null
@@ -243,61 +265,11 @@ export default {
         console.error('getContours error', err)
       }
     },
-    pickFile() {
-      return new Promise((resolve) => {
-        const choose = uni.chooseFile || uni.chooseMessageFile
-        if (!choose) {
-          uni.showToast({ title: '当前端暂不支持文件选择', icon: 'none' })
-          resolve(null)
-          return
-        }
-        choose({
-          count: 1,
-          type: 'all',
-          success: (res) => {
-            const file = res.tempFiles && res.tempFiles[0]
-            if (!file) {
-              resolve(null)
-              return
-            }
-            const path = file.path || file.tempFilePath
-            const name = file.name || (path ? path.split('/').pop() : '')
-            const fileObj =
-              file.file || (typeof File !== 'undefined' && file instanceof File ? file : null)
-            resolve({ ...file, path, name, fileObj })
-          },
-          fail: () => resolve(null)
-        })
-      })
-    },
-
-    buildExpandPayload() {
-      const label = this.refinedLabelFile || {}
-      const modalities = {}
-      this.modalityOrder.forEach((modality) => {
-        const file = this.getModalityFile(this.activeStudyId, modality)
-        if (file) {
-          modalities[modality] = {
-            name: file.name || '',
-            filePath: file.filePath || '',
-            localPath: file.localPath || ''
-          }
-        }
-      })
-      return {
-        patientId: this.patientId,
-        studyId: this.activeStudyId,
-        labelName: label.name || '',
-        labelPath: label.filePath || label.localPath || '',
-        labelSource: label.source || 'ctv_refine',
-        modalities
-      }
-    },
     async downloadRefinedLabel() {
       const label = this.refinedLabelFile
       const url = label?.filePath || label?.localPath || ''
       if (!url) {
-        uni.showToast({ title: '\u6682\u65e0\u7cbe\u4fee Label', icon: 'none' })
+        uni.showToast({ title: '暂无精修 Label', icon: 'none' })
         return
       }
       await this.triggerDownload(url)
@@ -305,13 +277,13 @@ export default {
     async triggerDownload(url) {
       if (!url) return
       const resolvedUrl = this.resolveDownloadUrl(url)
-      uni.showLoading({ title: '\u4e0b\u8f7d\u4e2d...', mask: true })
+      uni.showLoading({ title: '下载中...', mask: true })
       return new Promise((resolve) => {
         uni.downloadFile({
           url: resolvedUrl,
           success: (res) => {
             if (res.statusCode !== 200) {
-              uni.showToast({ title: '\u4e0b\u8f7d\u5931\u8d25', icon: 'none' })
+              uni.showToast({ title: '下载失败', icon: 'none' })
               uni.hideLoading()
               resolve(null)
               return
@@ -321,24 +293,24 @@ export default {
                 tempFilePath: res.tempFilePath,
                 success: (saveRes) => {
                   uni.hideLoading()
-                  uni.showToast({ title: '\u5df2\u4fdd\u5b58', icon: 'success' })
+                  uni.showToast({ title: '已保存', icon: 'success' })
                   resolve(saveRes.savedFilePath)
                 },
                 fail: () => {
                   uni.hideLoading()
-                  uni.showToast({ title: '\u5df2\u4e0b\u8f7d', icon: 'success' })
+                  uni.showToast({ title: '已下载', icon: 'success' })
                   resolve(res.tempFilePath)
                 }
               })
               return
             }
             uni.hideLoading()
-            uni.showToast({ title: '\u5df2\u4e0b\u8f7d', icon: 'success' })
+            uni.showToast({ title: '已下载', icon: 'success' })
             resolve(res.tempFilePath)
           },
           fail: () => {
             uni.hideLoading()
-            uni.showToast({ title: '\u4e0b\u8f7d\u5931\u8d25', icon: 'none' })
+            uni.showToast({ title: '下载失败', icon: 'none' })
             resolve(null)
           }
         })
@@ -496,61 +468,296 @@ export default {
 <style scoped>
 .page {
   min-height: 100vh;
-  background: #f7f7f8;
+  background: #edf4ff;
+}
+
+.ctv-area {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.ctv-hero {
+  border-radius: 28rpx;
+  padding: 24rpx 24rpx 20rpx;
+  background: linear-gradient(150deg, #2f78d8 0%, #3f88e6 46%, #6baef4 100%);
+  box-shadow: 0 18rpx 40rpx rgba(44, 110, 192, 0.28);
+}
+
+.hero-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14rpx;
+}
+
+.hero-title {
+  display: block;
+  font-size: 38rpx;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.hero-subtitle {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.84);
+}
+
+.hero-badge {
+  min-width: 62rpx;
+  height: 46rpx;
+  padding: 0 12rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.24);
+  border: 1rpx solid rgba(255, 255, 255, 0.42);
+  color: #ffffff;
+  font-size: 24rpx;
+  font-weight: 700;
+  line-height: 46rpx;
+  text-align: center;
+}
+
+.hero-metrics {
+  margin-top: 18rpx;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10rpx;
+}
+
+.metric-item {
+  border-radius: 16rpx;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1rpx solid rgba(255, 255, 255, 0.28);
+  padding: 10rpx 12rpx;
+}
+
+.metric-value {
+  display: block;
+  font-size: 24rpx;
+  font-weight: 650;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.metric-label {
+  display: block;
+  margin-top: 4rpx;
+  font-size: 21rpx;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.block-card {
+  margin-bottom: 0;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12rpx;
+  margin-bottom: 14rpx;
+}
+
+.section-header--edge {
+  margin-left: -24rpx;
+  margin-right: -24rpx;
+  padding-left: 24rpx;
+  padding-right: 10rpx;
+}
+
+.section-header--edge > .mi-btn {
+  margin-left: auto;
+  margin-right: 0;
+}
+
+.section-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #173a64;
+  margin-bottom: 0;
 }
 
 .study-modalities {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12rpx;
-  margin-top: 12rpx;
 }
 
 .modality-item {
   padding: 12rpx;
-  background: #f7f7f9;
+  background: #f6faff;
   border-radius: 16rpx;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12rpx;
-  border: 1rpx solid #e6e7eb;
+  border: 1rpx solid #d6e5f7;
 }
 
-.section-title {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: #111318;
-  margin-bottom: 12rpx;
+.modality-left {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+}
+
+.modality-dot {
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+  background: #8cb4e4;
+  box-shadow: 0 0 0 6rpx rgba(144, 180, 224, 0.2);
 }
 
 .segment-actions,
 .action-row {
   display: flex;
+  justify-content: space-between;
+  align-items: stretch;
   gap: 12rpx;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-wrap: nowrap;
+  margin-top: 14rpx;
+}
+
+.segment-actions .mi-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
+  padding: 0 12rpx;
+}
+
+.hint-bar {
+  margin-top: 12rpx;
+  padding: 12rpx 14rpx;
+  border-radius: 14rpx;
+  background: #f7fbff;
+  border: 1rpx solid #d9e8f9;
 }
 
 .segment-status {
-  margin-top: 12rpx;
+  margin-top: 14rpx;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12rpx;
 }
 
-.hint {
-  margin-top: 12rpx;
-}
-
 .label {
-  color: #0c0d0f;
+  color: #234567;
   font-weight: 600;
+  font-size: 26rpx;
 }
 
 .subtle {
-  color: #6b7075;
+  color: #5f7899;
   font-size: 24rpx;
 }
+
+.workflow-strip {
+  margin-bottom: 4rpx;
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.flow-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.flow-index {
+  width: 32rpx;
+  height: 32rpx;
+  border-radius: 50%;
+  text-align: center;
+  line-height: 32rpx;
+  font-size: 20rpx;
+  font-weight: 700;
+  color: #245eac;
+  background: #eaf3ff;
+  border: 1rpx solid #bfd5ef;
+}
+
+.flow-text {
+  font-size: 23rpx;
+  color: #53729a;
+}
+
+.flow-link {
+  flex: 1;
+  min-width: 18rpx;
+  height: 1rpx;
+  background: linear-gradient(90deg, #d2e3f8 0%, #bfd5ef 100%);
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 8rpx 16rpx;
+  border-radius: 999rpx;
+  border: 1rpx solid #d6e5f7;
+  font-size: 22rpx;
+  color: #4f6788;
+  background: #f8fbff;
+}
+
+.status-pill--success {
+  color: #1f8b4c;
+  border-color: #bce2cb;
+  background: #f3fbf6;
+}
+
+.status-pill--warning {
+  color: #b27613;
+  border-color: #f2dfbe;
+  background: #fdf8ef;
+}
+
+.status-pill--default {
+  color: #6a84a6;
+  border-color: #d6e5f7;
+  background: #f8fbff;
+}
+
+.mi-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  height: 68rpx;
+  line-height: 68rpx;
+  padding: 0 24rpx;
+  border-radius: 999rpx;
+  font-size: 25rpx;
+  border: 1rpx solid #c8daf4;
+  background: #ffffff;
+  color: #2f4f73;
+  box-shadow: 0 8rpx 20rpx rgba(47, 120, 216, 0.12);
+}
+
+.mi-btn--primary {
+  background: linear-gradient(135deg, #2f78d8 0%, #245eac 100%);
+  border-color: transparent;
+  color: #ffffff;
+  box-shadow: 0 12rpx 28rpx rgba(47, 120, 216, 0.26);
+}
+
+.mi-btn--ghost {
+  background: #ffffff;
+  color: #305377;
+}
+
+.mi-btn[disabled] {
+  opacity: 0.55;
+  box-shadow: none;
+}
+
+button::after {
+  border: none;
+}
 </style>
+

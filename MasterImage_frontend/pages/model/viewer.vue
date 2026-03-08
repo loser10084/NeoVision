@@ -30,7 +30,7 @@
               :max="100"
               :step="1"
               activeColor="#0f1012"
-              backgroundColor="#e6e7eb"
+              backgroundColor="#d6e5f7"
               @changing="updateThresholdPreview"
               @change="updateThreshold"
             />
@@ -44,7 +44,7 @@
               :max="6"
               :step="1"
               activeColor="#0f1012"
-              backgroundColor="#e6e7eb"
+              backgroundColor="#d6e5f7"
               @change="updatePointSize"
             />
             <text class="value">{{ pointSize }}</text>
@@ -57,7 +57,7 @@
               :max="60"
               :step="1"
               activeColor="#0f1012"
-              backgroundColor="#e6e7eb"
+              backgroundColor="#d6e5f7"
               @change="updateBrainAlpha"
             />
             <text class="value">{{ brainAlphaPercent }}%</text>
@@ -70,7 +70,7 @@
               :max="400000"
               :step="20000"
               activeColor="#0f1012"
-              backgroundColor="#e6e7eb"
+              backgroundColor="#d6e5f7"
               @change="updateMaxPoints"
             />
             <text class="value">{{ maxPoints }}</text>
@@ -1317,7 +1317,7 @@ void main() {
 <style scoped>
 .page {
   min-height: 100vh;
-  background: #f7f7f8;
+  background: #edf4ff;
 }
 
 .gl-wrap {
@@ -1325,8 +1325,8 @@ void main() {
   width: 100%;
   height: 520rpx;
   border-radius: 24rpx;
-  border: 1rpx solid #e3e4e8;
-  background: radial-gradient(circle at top, #ffffff 0%, #f4f5f7 50%, #eef0f4 100%);
+  border: 1rpx solid #cfdef4;
+  background: radial-gradient(circle at top, #ffffff 0%, #eef4ff 50%, #e6f0ff 100%);
   overflow: hidden;
 }
 
@@ -1345,7 +1345,7 @@ void main() {
   justify-content: center;
   text-align: center;
   padding: 24rpx;
-  color: #6a6f78;
+  color: #627d9f;
 }
 
 .controls {
@@ -1382,6 +1382,8 @@ void main() {
 .action-grid,
 .action-bar {
   display: flex;
+  justify-content: space-between;
+  align-items: stretch;
   flex-wrap: wrap;
   gap: 12rpx;
 }
@@ -1399,4 +1401,5 @@ void main() {
   font-size: 24rpx;
 }
 </style>
+
 
