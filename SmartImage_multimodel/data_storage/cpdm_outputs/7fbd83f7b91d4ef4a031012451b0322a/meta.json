@@ -1,0 +1,9 @@
+{
+  "jobId": "7fbd83f7b91d4ef4a031012451b0322a",
+  "sampleStep": 200,
+  "createdAt": 1773046985.3195462,
+  "inputFile": "VSD.Brain_3more.XX.O.OT.54517.nrrd",
+  "resultNpy": "pet.npy",
+  "resultPng": "pet.png",
+  "attentionNpy": "attention.npy"
+}

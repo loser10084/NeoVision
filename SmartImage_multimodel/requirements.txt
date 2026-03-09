@@ -1,11 +1,10 @@
-# =========================
+﻿# =========================
 # Python >=3.10
 # =========================
 
-# 基础库
-pandas>=1.0.0
+# 鍩虹搴?pandas>=1.0.0
 python-frontmatter>=0.4.0
-PyYAML>=5.3.1  # 避免 chromadb/langchain 依赖冲突
+PyYAML>=5.3.1  # 閬垮厤 chromadb/langchain 渚濊禆鍐茬獊
 numpy>=1.23.0
 pynrrd>=1.0.0
 torch>=2.0.0
@@ -13,12 +12,12 @@ scipy>=1.9.0
 matplotlib>=3.7.0
 pillow>=9.0.0
 
-# Web 框架
+# Web 妗嗘灦
 flask==3.0.3
 python-dotenv==1.0.1
 
 # =========================
-# LangChain 生态系统（旧版本）
+# LangChain 鐢熸€佺郴缁燂紙鏃х増鏈級
 # =========================
 langchain==0.2.16
 langchain-core==0.2.38
@@ -26,30 +25,41 @@ langchain-openai==0.1.22
 langchain-chroma>=0.1.0
 
 # =========================
-# 向量库 / 数据库 / 缓存
+# 鍚戦噺搴?/ 鏁版嵁搴?/ 缂撳瓨
 # =========================
 chromadb>=0.5.0
-redis>= 5.2.1   # 注意：langgraph-checkpoint-redis 要求 Redis 5.2.1 或更高版本
+redis>= 5.2.1   # 娉ㄦ剰锛歭anggraph-checkpoint-redis 瑕佹眰 Redis 5.2.1 鎴栨洿楂樼増鏈?
 
 # =========================
-# LangGraph 框架（如果需要）
+# LangGraph 妗嗘灦锛堝鏋滈渶瑕侊級
 # =========================
 langgraph==0.1.10
 langgraph-checkpoint-redis==0.3.3
 
 # =========================
-# Token / Embedding / Async 支持
+# Token / Embedding / Async 鏀寔
 # =========================
 tiktoken>=0.7.0
 aiohttp>=3.8.0
 posthog<=3.1.0
 # =========================
-# 数据验证
+# 鏁版嵁楠岃瘉
 # =========================
 pydantic>=2.0
 
 # =========================
-# 日志 / 性能
+# 鏃ュ織 / 鎬ц兘
 # =========================
 loguru==0.7.2
 psutil>=5.9.0
+
+# =========================
+# CPDM Inference
+# =========================
+omegaconf>=2.3.0
+einops>=0.6.0
+pytorch-lightning>=1.9.0,<2.1.0
+segmentation-models-pytorch>=0.3.3,<0.4.0
+torchvision>=0.15.0
+tensorboard>=2.14.0
+
