@@ -41,9 +41,6 @@
             </text>
           </view>
         </view>
-        <view class="hint-bar">
-          <text class="subtle">先确认 CTV 外扩 Label 已生成，再执行精修分割并下载结果。</text>
-        </view>
       </view>
 
       <view class="card block-card">
@@ -55,17 +52,17 @@
         <view class="workflow-strip">
           <view class="flow-step">
             <text class="flow-index">1</text>
-            <text class="flow-text">确认外扩 Label</text>
+            <text class="flow-text">确认外扩</text>
           </view>
           <view class="flow-link"></view>
           <view class="flow-step">
             <text class="flow-index">2</text>
-            <text class="flow-text">执行精修分割</text>
+            <text class="flow-text">精修分割</text>
           </view>
           <view class="flow-link"></view>
           <view class="flow-step">
             <text class="flow-index">3</text>
-            <text class="flow-text">下载精修结果</text>
+            <text class="flow-text">下载结果</text>
           </view>
         </view>
 

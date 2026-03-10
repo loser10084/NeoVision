@@ -1,9 +1,9 @@
-﻿{
+{
   "pages": [
     {
       "path": "pages/auth/login",
       "style": {
-        "navigationBarTitleText": "智影登录",
+        "navigationBarTitleText": "灵犀智影登录",
         "navigationBarBackgroundColor": "#ffffff",
         "navigationBarTextStyle": "black"
       }
@@ -11,7 +11,7 @@
     {
       "path": "pages/auth/register",
       "style": {
-        "navigationBarTitleText": "注册账户",
+        "navigationBarTitleText": "注册账号",
         "navigationBarBackgroundColor": "#ffffff",
         "navigationBarTextStyle": "black"
       }
@@ -36,7 +36,7 @@
     {
       "path": "pages/agent/chat",
       "style": {
-        "navigationBarTitleText": "智能体",
+        "navigationBarTitleText": "会诊中心",
         "navigationBarBackgroundColor": "#ffffff",
         "navigationBarTextStyle": "black"
       }
@@ -45,7 +45,7 @@
       "path": "pages/agent/conversation",
       "style": {
         "navigationStyle": "custom",
-        "navigationBarTitleText": "智能体对话",
+        "navigationBarTitleText": "会诊对话",
         "navigationBarBackgroundColor": "#ffffff",
         "navigationBarTextStyle": "black"
       }
@@ -54,6 +54,14 @@
       "path": "pages/patient/mine",
       "style": {
         "navigationBarTitleText": "我的",
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTextStyle": "black"
+      }
+    },
+    {
+      "path": "pages/settings/service",
+      "style": {
+        "navigationBarTitleText": "服务地址设置",
         "navigationBarBackgroundColor": "#ffffff",
         "navigationBarTextStyle": "black"
       }
@@ -93,7 +101,15 @@
     {
       "path": "pages/patient/ctv-heatmap",
       "style": {
-        "navigationBarTitleText": "置信度热力图",
+        "navigationBarTitleText": "热力图与CPDM",
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTextStyle": "black"
+      }
+    },
+    {
+      "path": "pages/patient/friends",
+      "style": {
+        "navigationBarTitleText": "医生好友",
         "navigationBarBackgroundColor": "#ffffff",
         "navigationBarTextStyle": "black"
       }
@@ -117,7 +133,7 @@
   ],
   "globalStyle": {
     "navigationBarTextStyle": "black",
-    "navigationBarTitleText": "智影",
+    "navigationBarTitleText": "灵犀智影",
     "navigationBarBackgroundColor": "#ffffff",
     "backgroundColor": "#f7fbff"
   },
@@ -130,20 +146,20 @@
       {
         "pagePath": "pages/patient/list",
         "text": "患者",
-        "iconPath": "static/tab-patient.png",
-        "selectedIconPath": "static/tab-patient-active.png"
+        "iconPath": "static/tab-patient-v2.png",
+        "selectedIconPath": "static/tab-patient-active-v2.png"
       },
       {
         "pagePath": "pages/agent/chat",
-        "text": "智能体",
-        "iconPath": "static/tab-agent.png",
-        "selectedIconPath": "static/tab-agent-active.png"
+        "text": "会诊",
+        "iconPath": "static/tab-agent-v2.png",
+        "selectedIconPath": "static/tab-agent-active-v2.png"
       },
       {
         "pagePath": "pages/patient/mine",
         "text": "我的",
-        "iconPath": "static/tab-mine.png",
-        "selectedIconPath": "static/tab-mine-active.png"
+        "iconPath": "static/tab-mine-v2.png",
+        "selectedIconPath": "static/tab-mine-active-v2.png"
       }
     ]
   },

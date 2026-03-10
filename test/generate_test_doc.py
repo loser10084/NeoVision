@@ -1,4 +1,5 @@
 ﻿import os
+from datetime import datetime
 from pathlib import Path
 from docx import Document
 from docx.shared import Pt, Cm, Inches, RGBColor
@@ -8,6 +9,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from docx.enum.section import WD_SECTION_START
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_BREAK
+from docx.enum.style import WD_STYLE_TYPE
 
 try:
     from PIL import Image, ImageDraw, ImageFont
@@ -27,9 +29,9 @@ META = {
     "doc_no": "SWC2022-T20220001-代码一定队",
     "project_cn": "灵犀智影",
     "project_en": "NeoVision",
-    "version": "2.0.5",
+    "version": "2.0.7",
     "team_name": "队名要好好起不然不队",
-    "date": "2022-3-21",
+    "date": "2026-3-9",
 }
 
 
@@ -139,6 +141,7 @@ def add_toc_field(doc):
     p.paragraph_format.space_after = Pt(0)
     p.paragraph_format.space_before = Pt(0)
     run = p.add_run()
+    set_run_font(run, size=12, east="Times New Roman")
 
     fld_begin = OxmlElement("w:fldChar")
     fld_begin.set(qn("w:fldCharType"), "begin")
@@ -224,6 +227,15 @@ def style_doc(doc):
         s.font.name = "Times New Roman"
         s._element.rPr.rFonts.set(qn("w:eastAsia"), "Times New Roman")
         s.font.color.rgb = RGBColor.from_string("000000")
+
+    for toc_name in [f"TOC {i}" for i in range(1, 10)] + ["Table of Contents"]:
+        try:
+            toc_style = doc.styles[toc_name]
+        except KeyError:
+            toc_style = doc.styles.add_style(toc_name, WD_STYLE_TYPE.PARAGRAPH)
+        toc_style.font.name = "Times New Roman"
+        toc_style._element.rPr.rFonts.set(qn("w:eastAsia"), "Times New Roman")
+        toc_style.font.size = Pt(12)
 
 
 def set_page_layout(section):
@@ -318,7 +330,7 @@ def add_revision_table(doc):
     set_run_font(run, size=16, bold=True, east="Times New Roman")
     p.paragraph_format.space_before = Pt(8)
     p.paragraph_format.space_after = Pt(6)
-    table = doc.add_table(rows=12, cols=5)
+    table = doc.add_table(rows=14, cols=5)
     table.style = "Table Grid"
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
 
@@ -340,6 +352,8 @@ def add_revision_table(doc):
         ["9", "补充模型测试用例", "2.0.3", "队员A", "2025.11.27"],
         ["10", "优化表述与排版", "2.0.4", "队员B", "2025.11.29"],
         ["11", "发布版本", "2.0.5", "队名要好好起不然不队", "2025.11.30"],
+        ["12", "补充CPDM预测测试内容", "2.0.6", "队员C", "2026.03.09"],
+        ["13", "补充医生好友添加测试内容", "2.0.7", "队员D", "2026.03.09"],
     ]
     for r_i, row in enumerate(rows, start=1):
         for c_i, val in enumerate(row):
@@ -374,12 +388,6 @@ def add_plan_section(doc):
     add_heading(doc, "1.2 测试范围", 2)
     add_body(doc, "测试范围覆盖前端调用的全部后端/模型接口，包含鉴权模块、患者模块、影像与序列模块、分割模型模块、轮廓模块、文件模块、CTV模块及智能体模块。")
 
-    range_tbl = doc.add_table(rows=11, cols=3)
-    range_tbl.style = "Table Grid"
-    for i, h in enumerate(["模块", "接口范围", "测试类型"]):
-        set_cell_text(range_tbl.cell(0, i), h, size=10.5, bold=True)
-        shade_cell(range_tbl.cell(0, i), "E26B0A")
-
     rows = [
         ["鉴权", "POST /api/auth/login, POST /api/auth/register", "单元+功能"],
         ["患者", "GET/POST/PUT/DELETE /api/patients*, POST /api/patients/{id}/review", "单元+功能"],
@@ -390,8 +398,16 @@ def add_plan_section(doc):
         ["多模态分割", "POST /api/studies/{studyId}/segment/multimodal", "单元+功能"],
         ["模型查询/下载", "GET /api/studies/{studyId}/model, /download/volume, /download/label", "单元+功能"],
         ["CTV", "POST /api/ctv/refine, /api/ctv/expand, /api/ctv/heatmap", "单元+功能"],
+        ["CPDM", "POST /api/cpdm/ct2pet, GET /api/cpdm/jobs/{jobId}, GET /api/cpdm/jobs/{jobId}/result, GET /api/cpdm/outputs/{jobId}/{filename}", "单元+功能"],
+        ["医生社交", "GET /api/patients/social/doctors, GET /api/patients/social/friends, POST/DELETE /api/patients/social/friends/{friendId}", "单元+功能"],
         ["智能体", "GET /health, GET /api/agent/history, POST /api/agent/chat, /chat/stream", "单元+功能"],
     ]
+
+    range_tbl = doc.add_table(rows=1 + len(rows), cols=3)
+    range_tbl.style = "Table Grid"
+    for i, h in enumerate(["模块", "接口范围", "测试类型"]):
+        set_cell_text(range_tbl.cell(0, i), h, size=10.5, bold=True)
+        shade_cell(range_tbl.cell(0, i), "E26B0A")
     for r, row in enumerate(rows, start=1):
         for c, val in enumerate(row):
             set_cell_text(range_tbl.cell(r, c), val, size=10)
@@ -432,7 +448,10 @@ UNIT_MODULES = [
     ("单模态分割接口模块", ["POST /api/studies/{studyId}/segment"], "验证单文件分割推理与结果持久化。"),
     ("多模态分割接口模块", ["POST /api/studies/{studyId}/segment/multimodal"], "验证四模态输入校验与分割输出。"),
     ("模型获取与下载接口模块", ["GET /api/studies/{studyId}/model", "GET /api/studies/{studyId}/download/volume", "GET /api/studies/{studyId}/download/label"], "验证模型信息返回与下载跳转。"),
-    ("CTV算法与智能体接口模块", ["POST /api/ctv/refine", "POST /api/ctv/expand", "POST /api/ctv/heatmap", "GET /health", "GET /api/agent/history", "POST /api/agent/chat", "POST /api/agent/chat/stream"], "验证CTV处理链路与智能体响应。"),
+    ("CTV算法接口模块", ["POST /api/ctv/refine", "POST /api/ctv/expand", "POST /api/ctv/heatmap"], "验证CTV处理链路与热力图输出。"),
+    ("CPDM预测接口模块", ["POST /api/cpdm/ct2pet", "GET /api/cpdm/jobs/{jobId}", "GET /api/cpdm/jobs/{jobId}/result", "GET /api/cpdm/outputs/{jobId}/{filename}"], "验证CPDM任务提交、状态轮询、结果查询与PNG输出访问。"),
+    ("医生社交与好友管理接口模块", ["GET /api/patients/social/doctors", "GET /api/patients/social/friends", "POST /api/patients/social/friends/{friendId}", "DELETE /api/patients/social/friends/{friendId}"], "验证医生检索、好友添加、好友删除与列表状态同步。"),
+    ("智能体接口模块", ["GET /health", "GET /api/agent/history", "POST /api/agent/chat", "POST /api/agent/chat/stream"], "验证智能体健康检查、历史会话与对话响应。"),
 ]
 
 
@@ -507,6 +526,8 @@ FUNC_MODULES = [
     "GTV草图生成功能",
     "CTV精修功能",
     "CTV扩展与热力图功能",
+    "CPDM预测与结果下载功能",
+    "医生好友搜索与添加功能",
     "智能体会话与历史功能",
 ]
 
@@ -612,12 +633,19 @@ def build_doc():
     add_function_sections(doc)
     add_system_sections(doc)
 
-    doc.save(DOCX_PATH)
+    try:
+        doc.save(DOCX_PATH)
+        return DOCX_PATH
+    except PermissionError:
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        fallback_path = DOCX_PATH.with_name(f"{DOCX_PATH.stem}_{stamp}{DOCX_PATH.suffix}")
+        doc.save(fallback_path)
+        return fallback_path
 
 
 if __name__ == "__main__":
-    build_doc()
-    print(str(DOCX_PATH))
+    out_path = build_doc()
+    print(str(out_path))
 
 
 

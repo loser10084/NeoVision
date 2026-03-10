@@ -4,8 +4,8 @@
       <view class="ctv-hero">
         <view class="hero-main">
           <view>
-            <text class="hero-title">{{ '置信度热力图工作台' }}</text>
-            <text class="hero-subtitle">{{ '基于多模态分割结果生成置信度分布热图' }}</text>
+            <text class="hero-title">{{ '热力图与CPDM工作台' }}</text>
+            <text class="hero-subtitle">{{ '多模态热力图生成与CPDM预测' }}</text>
           </view>
           <view class="hero-badge">AI</view>
         </view>
@@ -40,9 +40,6 @@
               {{ modalityTagText(activeStudyId, modality) }}
             </text>
           </view>
-        </view>
-        <view class="hint-bar">
-          <text class="subtle">{{ '全部模态就绪后可生成热力图，用于医生快速评估分割置信区域。' }}</text>
         </view>
       </view>
 
@@ -81,9 +78,6 @@
         <view v-if="heatmapUrl" class="preview">
           <image :src="heatmapUrl" mode="widthFix" class="heatmap-image" />
         </view>
-        <view v-else class="hint">
-          <text class="subtle">{{ '暂无热力图，请先生成。' }}</text>
-        </view>
       </view>
 
       <view class="card block-card">
@@ -91,12 +85,17 @@
           <text class="section-title">{{ 'CPDM ' + '预测' }}</text>
           <text class="status-pill" :class="`status-pill--${cpdmStatusType}`">{{ cpdmStatusText }}</text>
         </view>
-        <view class="hint-bar">
-          <text class="subtle">{{ '上传 CT 文件（.npy/.nrrd/.png）并执行预测' }}</text>
+        <view class="cpdm-source">
+          <view class="cpdm-source-main">
+            <text class="subtle">{{ cpdmSourceText }}</text>
+            <button class="mi-btn mi-btn--ghost mi-btn--mini" :disabled="cpdmProcessing || !cpdmSelectableFiles.length" @click="pickCpdmSource">
+              {{ '选择文件' }}
+            </button>
+          </view>
+          <text v-if="!cpdmSelectedFile" class="subtle subtle--weak">{{ '请先在当前序列中选择一个已上传文件' }}</text>
         </view>
-
         <view class="segment-actions">
-          <button class="mi-btn mi-btn--primary" :disabled="cpdmProcessing" @click="submitCpdm">
+          <button class="mi-btn mi-btn--primary" :disabled="cpdmProcessing || !cpdmSelectedFile" @click="submitCpdm">
             {{ cpdmProcessing ? '处理中...' : '上传' }}
           </button>
           <button class="mi-btn mi-btn--ghost" :disabled="!cpdmPngUrl" @click="openCpdmPng">{{ '下载图片' }}</button>
@@ -105,8 +104,8 @@
         <view v-if="cpdmPngUrl" class="preview">
           <image :src="cpdmPngUrl" mode="widthFix" class="heatmap-image" />
         </view>
-        <view v-else class="hint">
-          <text class="subtle">{{ cpdmEntry?.inputName ? ('输入文件：' + cpdmEntry.inputName) : '暂无 CPDM 结果' }}</text>
+        <view v-if="cpdmEntry?.inputName" class="hint">
+          <text class="subtle">{{ '输入文件：' + cpdmEntry.inputName }}</text>
         </view>
       </view>
     </view>
@@ -149,6 +148,40 @@ export default {
       if (!this.activeStudyId) return null
       return this.cpdmMap?.[this.activeStudyId] || null
     },
+    cpdmSelectableFiles() {
+      if (!this.activeStudyId) return []
+      const studyFiles = this.studyFileMap?.[this.activeStudyId] || {}
+      return this.modalityOrder
+        .map((modality) => {
+          const file = studyFiles?.[modality]
+          if (!file) return null
+          const hasPath = Boolean(file.filePath || file.localPath)
+          if (!hasPath) return null
+          return {
+            key: modality,
+            label: this.modalityLabel(modality),
+            name: file.name || `${modality}.nrrd`,
+            file
+          }
+        })
+        .filter(Boolean)
+    },
+    cpdmSelectedKey() {
+      return this.cpdmEntry?.selectedKey || ''
+    },
+    cpdmSelectedFile() {
+      if (!this.cpdmSelectedKey) return null
+      return this.cpdmSelectableFiles.find((item) => item.key === this.cpdmSelectedKey) || null
+    },
+    cpdmSourceText() {
+      if (this.cpdmSelectedFile) {
+        return `已选：${this.cpdmSelectedFile.label} / ${this.cpdmSelectedFile.name}`
+      }
+      if (!this.cpdmSelectableFiles.length) {
+        return '当前序列暂无可用输入文件'
+      }
+      return '请选择输入文件'
+    },
     cpdmPngUrl() {
       return this.cpdmEntry?.petPngUrl || ''
     },
@@ -168,7 +201,7 @@ export default {
         const pct = Number(this.cpdmEntry?.progress || 0)
         return `处理中 ${pct}%`
       }
-      return '待上传'
+      return this.cpdmSelectedFile ? '待提交' : '待选择文件'
     },
     cpdmProcessing() {
       return this.cpdmSubmitting || this.cpdmStatus === 'queued' || this.cpdmStatus === 'running'
@@ -353,12 +386,16 @@ export default {
       }
       if (this.cpdmSubmitting) return
 
-      const file = await this.pickCpdmFile()
-      if (!file) return
+      const selected = this.cpdmSelectedFile
+      if (!selected) {
+        uni.showToast({ title: '请先选择输入文件', icon: 'none' })
+        return
+      }
 
       this.cpdmSubmitting = true
       uni.showLoading({ title: '提交中...', mask: true })
       try {
+        const file = await this.prepareCpdmUploadFile(selected)
         const payload = await this.uploadCpdmFile(file)
         const jobId = payload?.jobId || ''
         if (!jobId) {
@@ -367,7 +404,10 @@ export default {
         this.cpdmMap = {
           ...(this.cpdmMap || {}),
           [this.activeStudyId]: {
-            inputName: file.name || 'ct.npy',
+            ...(this.cpdmEntry || {}),
+            selectedKey: selected.key,
+            selectedName: selected.name,
+            inputName: selected.name || file.name || 'ct.npy',
             jobId,
             status: payload.status || 'queued',
             progress: Number(payload.progress || 0),
@@ -387,37 +427,54 @@ export default {
         uni.hideLoading()
       }
     },
-    async pickCpdmFile() {
-      return new Promise((resolve) => {
-        const choose = uni.chooseFile || uni.chooseMessageFile
-        if (!choose) {
-          uni.showToast({ title: '当前环境不支持选择文件', icon: 'none' })
-          resolve(null)
-          return
+    pickCpdmSource() {
+      if (!this.activeStudyId) return
+      if (!this.cpdmSelectableFiles.length) {
+        uni.showToast({ title: '当前序列暂无可用文件', icon: 'none' })
+        return
+      }
+      const itemList = this.cpdmSelectableFiles.map((item) => `${item.label} - ${item.name}`)
+      uni.showActionSheet({
+        itemList,
+        success: ({ tapIndex }) => {
+          const selected = this.cpdmSelectableFiles[tapIndex]
+          if (!selected) return
+          const next = {
+            ...(this.cpdmEntry || {}),
+            selectedKey: selected.key,
+            selectedName: selected.name,
+            inputName: selected.name,
+            jobId: '',
+            status: 'idle',
+            progress: 0,
+            message: '',
+            error: '',
+            petPngUrl: ''
+          }
+          this.cpdmMap = {
+            ...(this.cpdmMap || {}),
+            [this.activeStudyId]: next
+          }
+          this.saveCpdmToStorage()
         }
-        choose({
-          count: 1,
-          type: 'all',
-          success: (res) => {
-            const item = res.tempFiles && res.tempFiles[0]
-            if (!item) {
-              resolve(null)
-              return
-            }
-            const path = item.path || item.tempFilePath || ''
-            const name = item.name || (path ? path.split('/').pop() : 'ct.npy')
-            const fileObj = item.file || null
-            resolve({ path, name, fileObj })
-          },
-          fail: () => resolve(null)
-        })
       })
+    },
+    async prepareCpdmUploadFile(selected) {
+      const name = selected?.name || `${selected?.key || 'ct'}.nrrd`
+      if (this.isH5) {
+        const blob = await this.fetchBlob(selected?.file)
+        if (!blob) throw new Error('missing file blob')
+        return { name, blob }
+      }
+      const path = await this.resolveLocalPath(selected?.file)
+      if (!path) throw new Error('missing file path')
+      return { name, path }
     },
     async uploadCpdmFile(file) {
       const token = getToken()
-      if (this.isH5 && file.fileObj) {
+      if (this.isH5) {
         const form = new FormData()
-        form.append('ct', file.fileObj, file.name || 'ct.npy')
+        form.append('ct', file.fileObj || file.blob, file.name || 'ct.npy')
         const res = await fetch(resolveModelUrl('/api/cpdm/ct2pet'), {
           method: 'POST',
           body: form,
@@ -498,11 +555,12 @@ export default {
         if (err?.statusCode === 404 || err?.error === 'job not found') {
           const next = {
             ...(this.cpdmEntry || {}),
-            jobId,
-            status: 'failed',
-            progress: 100,
-            message: '任务不存在或已过期',
-            error: 'job not found'
+            jobId: '',
+            status: 'idle',
+            progress: 0,
+            message: '任务不存在，请重新提交',
+            error: '',
+            petPngUrl: ''
           }
           this.cpdmMap = {
             ...(this.cpdmMap || {}),
@@ -864,6 +922,17 @@ export default {
   background: #f7fbff;
 }
 
+.cpdm-source {
+  margin-top: 2rpx;
+}
+
+.cpdm-source-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12rpx;
+}
+
 .label {
   color: #234567;
   font-weight: 600;
@@ -873,6 +942,13 @@ export default {
 .subtle {
   color: #5f7899;
   font-size: 24rpx;
+}
+
+.subtle--weak {
+  display: block;
+  margin-top: 8rpx;
+  color: #89a2bf;
+  font-size: 22rpx;
 }
 
 .workflow-strip {
@@ -968,6 +1044,15 @@ export default {
 .mi-btn--ghost {
   background: #ffffff;
   color: #305377;
+}
+
+.mi-btn--mini {
+  height: 56rpx;
+  line-height: 56rpx;
+  font-size: 22rpx;
+  padding: 0 18rpx;
+  flex: 0 0 auto;
+  min-width: auto;
 }
 
 .mi-btn[disabled] {

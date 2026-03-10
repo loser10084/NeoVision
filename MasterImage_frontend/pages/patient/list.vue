@@ -8,7 +8,7 @@
               <text class="hero-title">你好，{{ doctorName }}</text>
               <text class="hero-subtitle">放疗影像智能勾画工作台</text>
             </view>
-            <view class="hero-avatar">{{ doctorInitial }}</view>
+          <image class="hero-avatar" src="/static/project_icon_v2.jpg" mode="aspectFill" />
           </view>
 
           <view class="hero-search-wrap">
@@ -148,7 +148,7 @@ export default {
         { key: 'upload', title: '影像上传', icon: '/static/icons/ic-upload-image.svg' },
         { key: 'gtv', title: 'GTV初稿', icon: '/static/icons/ic-gtv.svg' },
         { key: 'ctv', title: 'CTV流程', icon: '/static/icons/ic-ctv.svg' },
-        { key: 'consult', title: 'AI会诊', icon: '/static/icons/ic-ai-consult.svg' }
+        { key: 'consult', title: '会诊中心', icon: '/static/icons/ic-ai-consult.svg' }
       ],
       doctors: [
         { id: 't1', name: '脑胶质瘤模板', dept: 'GTV v3.2', initial: '脑' },
@@ -163,9 +163,6 @@ export default {
       const profile = uni.getStorageSync('userProfile') || {}
       const name = profile.name || '医生'
       return String(name).endsWith('医生') ? name : `${name}医生`
-    },
-    doctorInitial() {
-      return String(this.doctorName || '医').slice(0, 1)
     }
   },
   onLoad() {
@@ -342,15 +339,9 @@ export default {
 .hero-avatar {
   width: 96rpx;
   height: 96rpx;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
+  border-radius: 24rpx;
   border: 2rpx solid rgba(255, 255, 255, 0.48);
-  color: #ffffff;
-  font-size: 40rpx;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: rgba(255, 255, 255, 0.22);
 }
 
 .hero-search-wrap {
@@ -383,7 +374,7 @@ export default {
   border: 1rpx solid rgba(255, 255, 255, 0.2);
   display: flex;
   align-items: center;
-  padding: 0 18rpx;
+  padding: 0 14rpx 0 18rpx;
   box-sizing: border-box;
 }
 
@@ -412,6 +403,8 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
+  margin-left: 8rpx;
+  margin-right: 6rpx;
   background: rgba(255, 255, 255, 0.28);
   color: #ffffff;
   font-size: 24rpx;
@@ -599,10 +592,12 @@ export default {
 .section-head--patient {
   display: flex;
   justify-content: space-between;
-  margin-left: -30rpx;
-  margin-right: -30rpx;
-  padding-left: 30rpx;
-  padding-right: 10rpx;
+  align-items: center;
+  gap: 12rpx;
+  margin-left: 0;
+  margin-right: 0;
+  padding-left: 0;
+  padding-right: 4rpx;
 }
 
 .section-name {
@@ -636,7 +631,7 @@ export default {
 
 .section-head--patient .mi-pill-btn {
   margin-left: auto;
-  margin-right: 0;
+  margin-right: 6rpx;
 }
 
 .mi-pill-btn::after {

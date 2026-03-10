@@ -7,7 +7,7 @@
             <text class="hero-title">创建医生账户</text>
             <text class="hero-subtitle">用于放疗影像勾画与复核工作流</text>
           </view>
-          <image class="hero-logo" src="/static/project_icon.jpg" mode="aspectFill" />
+          <image class="hero-logo" src="/static/project_icon_v2.jpg" mode="aspectFill" />
         </view>
         <view class="hero-chips">
           <text class="hero-chip">身份审核</text>

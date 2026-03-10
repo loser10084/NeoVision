@@ -7,7 +7,7 @@
             <text class="hero-title">智影医生端</text>
             <text class="hero-subtitle">放疗影像智能勾画协作平台</text>
           </view>
-          <image class="hero-logo" src="/static/project_icon.jpg" mode="aspectFill" />
+          <image class="hero-logo" src="/static/project_icon_v2.jpg" mode="aspectFill" />
         </view>
         <view class="hero-chips">
           <text class="hero-chip">影像管理</text>
@@ -24,7 +24,9 @@
             <view class="section-title">欢迎回来</view>
             <text class="hint">使用注册手机号或工号登录</text>
           </view>
-          <view class="pill">安全加密</view>
+          <view class="service-fab service-fab--light" @tap="goServiceSettings">
+            <text class="service-fab-icon service-fab-icon--blue">⚙</text>
+          </view>
         </view>
 
         <wd-form ref="formRef" :model="form" :rules="rules">
@@ -124,6 +126,9 @@ export default {
     goRegister() {
       uni.navigateTo({ url: '/pages/auth/register' })
     },
+    goServiceSettings() {
+      uni.navigateTo({ url: '/pages/settings/service' })
+    },
     fillFromRegister(payload) {
       if (!payload) return
       this.form.username = payload.username || ''
@@ -156,6 +161,32 @@ export default {
   align-items: center;
   justify-content: space-between;
   gap: 20rpx;
+}
+
+.service-fab {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 999rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1rpx solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.service-fab-icon {
+  color: #ffffff;
+  font-size: 28rpx;
+  line-height: 1;
+}
+
+.service-fab--light {
+  border-color: #cde0f7;
+  background: #f1f7ff;
+}
+
+.service-fab-icon--blue {
+  color: #2f78d8;
 }
 
 .hero-title {
@@ -228,15 +259,6 @@ export default {
 .hint {
   color: #627d9f;
   font-size: 26rpx;
-}
-
-.pill {
-  padding: 12rpx 18rpx;
-  border-radius: 999rpx;
-  background: #eef5ff;
-  color: #245eac;
-  font-size: 24rpx;
-  border: 1rpx solid #c8dcf6;
 }
 
 .action-bar {

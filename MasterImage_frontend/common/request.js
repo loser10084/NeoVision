@@ -1,10 +1,12 @@
-const DEFAULT_GATEWAY_URL = 'http://localhost:8080'
-const DEFAULT_MODEL_URL = 'http://localhost:5001'
 const AUTH_WHITE_LIST = ['/api/auth/login', '/api/auth/register']
+const RUNTIME_SERVICE_URLS_KEY = 'runtime_service_urls'
+
+const FALLBACK_GATEWAY_URL = 'http://192.168.1.100:8080'
+const FALLBACK_MODEL_URL = 'http://192.168.1.100:5001'
 
 function normalizeBaseUrl(value) {
   if (!value) return ''
-  return String(value).replace(/\/+$/, '')
+  return String(value).trim().replace(/\/+$/, '')
 }
 
 function readEnv(key) {
@@ -15,33 +17,86 @@ function readEnv(key) {
   }
 }
 
-const SERVICE_BASE_URLS = {
-  gateway: normalizeBaseUrl(readEnv('VUE_APP_GATEWAY_URL') || DEFAULT_GATEWAY_URL),
+const ENV_SERVICE_BASE_URLS = {
+  gateway: normalizeBaseUrl(readEnv('VUE_APP_GATEWAY_URL')),
   auth: normalizeBaseUrl(readEnv('VUE_APP_AUTH_URL')),
   patient: normalizeBaseUrl(readEnv('VUE_APP_PATIENT_URL')),
   study: normalizeBaseUrl(readEnv('VUE_APP_STUDY_URL')),
-  model: normalizeBaseUrl(readEnv('VUE_APP_MODEL_URL') || DEFAULT_MODEL_URL)
+  model: normalizeBaseUrl(readEnv('VUE_APP_MODEL_URL'))
 }
 
-export const BASE_URL = SERVICE_BASE_URLS.gateway
-export const MODEL_BASE_URL = SERVICE_BASE_URLS.model
+function readRuntimeServiceCache() {
+  try {
+    const cache = uni.getStorageSync(RUNTIME_SERVICE_URLS_KEY)
+    if (!cache || typeof cache !== 'object') return {}
+    return cache
+  } catch (err) {
+    return {}
+  }
+}
+
+export function getRuntimeServiceUrls() {
+  const cache = readRuntimeServiceCache()
+  return {
+    gatewayUrl: normalizeBaseUrl(cache.gatewayUrl),
+    modelUrl: normalizeBaseUrl(cache.modelUrl),
+    updatedAt: Number(cache.updatedAt || 0)
+  }
+}
+
+export function setRuntimeServiceUrls(payload = {}) {
+  const next = {
+    gatewayUrl: normalizeBaseUrl(payload.gatewayUrl),
+    modelUrl: normalizeBaseUrl(payload.modelUrl),
+    updatedAt: Date.now()
+  }
+  uni.setStorageSync(RUNTIME_SERVICE_URLS_KEY, next)
+  return next
+}
+
+export function clearRuntimeServiceUrls() {
+  uni.removeStorageSync(RUNTIME_SERVICE_URLS_KEY)
+}
+
+function buildServiceBaseUrls() {
+  const runtime = getRuntimeServiceUrls()
+
+  const gateway = runtime.gatewayUrl || ENV_SERVICE_BASE_URLS.gateway || FALLBACK_GATEWAY_URL
+  const model = runtime.modelUrl || ENV_SERVICE_BASE_URLS.model || FALLBACK_MODEL_URL
+
+  return {
+    gateway,
+    auth: ENV_SERVICE_BASE_URLS.auth || gateway,
+    patient: ENV_SERVICE_BASE_URLS.patient || gateway,
+    study: ENV_SERVICE_BASE_URLS.study || gateway,
+    model
+  }
+}
+
+export function getEffectiveServiceUrls() {
+  const urls = buildServiceBaseUrls()
+  return {
+    gatewayUrl: urls.gateway,
+    modelUrl: urls.model
+  }
+}
 
 export function resolveServiceBase(name) {
-  const base = SERVICE_BASE_URLS[name]
-  return base || SERVICE_BASE_URLS.gateway
+  const urls = buildServiceBaseUrls()
+  return urls[name] || urls.gateway
 }
 
 export function resolveApiBase(path) {
   const gateway = resolveServiceBase('gateway')
   if (!path || /^https?:\/\//i.test(path)) return gateway
-  if (path.startsWith('/api/auth/')) return resolveServiceBase('auth') || gateway
+  if (path.startsWith('/api/auth/')) return resolveServiceBase('auth')
   if (path.startsWith('/api/patients/') && /\/studies(\/|$)/.test(path)) {
-    return resolveServiceBase('study') || gateway
+    return resolveServiceBase('study')
   }
   if (path.startsWith('/api/studies/') || path.startsWith('/api/files/')) {
-    return resolveServiceBase('study') || gateway
+    return resolveServiceBase('study')
   }
-  if (path.startsWith('/api/patients')) return resolveServiceBase('patient') || gateway
+  if (path.startsWith('/api/patients')) return resolveServiceBase('patient')
   return gateway
 }
 
@@ -69,6 +124,9 @@ export function resolveStudyResourceUrl(path = '') {
   const normalized = path.startsWith('/') ? path : `/${path}`
   return `${base}${normalized}`
 }
+
+export const BASE_URL = resolveServiceBase('gateway')
+export const MODEL_BASE_URL = resolveServiceBase('model')
 
 export function getToken() {
   return uni.getStorageSync('token') || ''
@@ -152,7 +210,7 @@ export function request({ url, method = 'GET', data = {}, header = {}, showError
             resolve(payload)
             return
           }
-          showError && uni.showToast({ title: `Invalid response (${statusCode})`, icon: 'none' })
+          showError && uni.showToast({ title: `响应异常 (${statusCode})`, icon: 'none' })
           reject(new Error('Invalid response'))
           return
         }
@@ -187,7 +245,7 @@ export function requestModel({ url, method = 'GET', data = {}, header = {}, show
         const { statusCode } = res
         const payload = parsePayload(res)
         if (statusCode < 200 || statusCode >= 300) {
-          showError && uni.showToast({ title: 'model error', icon: 'none' })
+          showError && uni.showToast({ title: '模型服务异常', icon: 'none' })
           reject(new Error(`HTTP ${statusCode}`))
           return
         }
@@ -199,7 +257,7 @@ export function requestModel({ url, method = 'GET', data = {}, header = {}, show
         resolve(payload)
       },
       fail: (err) => {
-        showError && uni.showToast({ title: 'network error', icon: 'none' })
+        showError && uni.showToast({ title: '网络异常', icon: 'none' })
         reject(err)
       }
     })
@@ -210,5 +268,9 @@ export default {
   request,
   setAuth,
   clearAuth,
-  requestModel
+  requestModel,
+  getRuntimeServiceUrls,
+  setRuntimeServiceUrls,
+  clearRuntimeServiceUrls,
+  getEffectiveServiceUrls
 }

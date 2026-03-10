@@ -4,7 +4,7 @@
       <view class="back" @click="goBack">
         <wd-icon name="arrow-left" />
       </view>
-      <image class="header-avatar" src="/static/project_icon.jpg" mode="aspectFill" />
+      <image class="header-avatar" src="/static/project_icon_v2.jpg" mode="aspectFill" />
       <view class="header-info">
         <text class="header-name">{{ headerTitle }}</text>
         <text class="header-status">{{ headerStatus }}</text>
@@ -13,8 +13,8 @@
     </view>
 
     <view class="context-strip">
-      <text class="context-chip">{{ isConsultation ? '联合会诊' : '灵犀智影AI助手' }}</text>
-      <text class="context-chip">{{ isConsultation ? `成员 ${members.length}` : '医学影像模式' }}</text>
+      <text class="context-chip">{{ isConsultation ? '联合会诊' : 'AI问答' }}</text>
+      <text class="context-chip">{{ isConsultation ? `成员 ${members.length}` : '影像问答模式' }}</text>
       <text v-if="isConsultation && consultationId" class="context-chip">#{{ consultationId }}</text>
     </view>
 
@@ -151,8 +151,8 @@ export default {
       input: '',
       loading: false,
       scrollTarget: '',
-      userAvatar: '/static/logo.png',
-      agentAvatar: '/static/project_icon.jpg',
+      userAvatar: '/static/project_icon_v2.jpg',
+      agentAvatar: '/static/project_icon_v2.jpg',
       pendingAttachment: null,
       messages: [],
       mode: 'ai',
@@ -169,7 +169,7 @@ export default {
       return this.mode === 'consultation'
     },
     headerTitle() {
-      return this.isConsultation ? (this.consultationTitle || '联合会诊') : '灵犀智影AI助手'
+      return this.isConsultation ? (this.consultationTitle || '联合会诊') : 'AI问答'
     },
     headerStatus() {
       if (this.isConsultation) {
@@ -198,7 +198,7 @@ export default {
       id: `welcome-${Date.now()}`,
       self: false,
       type: 'TEXT',
-      content: '你好，我是灵犀智影AI助手，请输入你的问题。',
+      content: '你好，我是AI助手，请输入你的问题。',
       createdAt: ''
     })
     await this.loadAiHistory()
@@ -432,7 +432,7 @@ export default {
           this.replaceTyping(typingId, reply)
         } catch (err) {
           console.error('agent image chat error', err)
-          this.replaceTyping(typingId, '抱歉，智能体暂时无法响应，请稍后重试。')
+          this.replaceTyping(typingId, '抱歉，AI助手暂时无法响应，请稍后重试。')
         } finally {
           this.loading = false
         }
@@ -460,7 +460,7 @@ export default {
         }
       } catch (err) {
         console.error('agent chat error', err)
-        this.replaceTyping(typingId, '抱歉，智能体暂时无法响应，请稍后重试。')
+        this.replaceTyping(typingId, '抱歉，AI助手暂时无法响应，请稍后重试。')
       } finally {
         this.loading = false
       }

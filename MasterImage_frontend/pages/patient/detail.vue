@@ -11,7 +11,7 @@
         </view>
         <view class="hero-meta">
           <text>ID {{ patient.id || '-' }}</text>
-          <text>影像号 {{ patient.studyId || '-' }}</text>
+          <text>影像 {{ patient.studyId || '-' }}</text>
         </view>
         <view class="hero-kpi-grid">
           <view class="hero-kpi-item">
@@ -55,28 +55,28 @@
             <text class="row-title">GTV 初稿</text>
             <view class="row-right">
               <text class="status-pill" :class="`status-pill--${gtvStatusType}`">{{ gtvStatusText }}</text>
-              <text class="row-arrow">›</text>
+              <text class="row-arrow">></text>
             </view>
           </view>
           <view class="result-row" @click="openCtvRefine(patient.studyId)">
-            <text class="row-title">CTV 外扩</text>
-            <view class="row-right">
-              <text class="status-pill" :class="`status-pill--${ctvExpandStatusType}`">{{ ctvExpandStatusText }}</text>
-              <text class="row-arrow">›</text>
-            </view>
-          </view>
-          <view class="result-row" @click="openCtvExpand(patient.studyId)">
             <text class="row-title">CTV 精修</text>
             <view class="row-right">
               <text class="status-pill" :class="`status-pill--${ctvStatusType}`">{{ ctvStatusText }}</text>
-              <text class="row-arrow">›</text>
+              <text class="row-arrow">></text>
+            </view>
+          </view>
+          <view class="result-row" @click="openCtvExpand(patient.studyId)">
+            <text class="row-title">CTV 外扩</text>
+            <view class="row-right">
+              <text class="status-pill" :class="`status-pill--${ctvExpandStatusType}`">{{ ctvExpandStatusText }}</text>
+              <text class="row-arrow">></text>
             </view>
           </view>
           <view class="result-row" @click="openHeatmap(patient.studyId)">
-            <text class="row-title">置信度热力图</text>
+            <text class="row-title">热力图与 CPDM</text>
             <view class="row-right">
               <text class="status-pill status-pill--warning">可查看</text>
-              <text class="row-arrow">›</text>
+              <text class="row-arrow">></text>
             </view>
           </view>
         </view>
@@ -89,18 +89,21 @@
             {{ uploading ? '上传中...' : '新增影像' }}
           </button>
         </view>
+
         <view v-for="item in studies" :key="item.id" class="study">
           <view class="row">
             <view>
               <text class="label">{{ item.modality || '-' }}</text>
               <text class="subtle">{{ truncateText(item.desc || '暂无描述', 10) }}</text>
             </view>
-            <text class="status-pill status-pill--default">{{ item.status || '处理中' }}</text>
+            <text class="status-pill status-pill--default">{{ studyStatusText(item.status) }}</text>
           </view>
+
           <view class="meta">
-            <text>序列号 {{ item.id }}</text>
+            <text>序列 {{ item.id }}</text>
             <text>{{ item.time || '-' }}</text>
           </view>
+
           <view class="study-modalities">
             <view v-for="modality in modalityOrder" :key="modality" class="modality-item">
               <text class="label">{{ modalityLabel(modality) }}</text>
@@ -109,14 +112,7 @@
               </text>
             </view>
           </view>
-          <view class="study-status-row">
-            <view class="status-item">
-              <text class="label">Label</text>
-              <text class="status-pill" :class="studyLabelMap[item.id] ? 'status-pill--success' : 'status-pill--warning'">
-                {{ studyLabelMap[item.id] ? '已生成' : '未生成' }}
-              </text>
-            </view>
-          </view>
+
           <view class="study-actions-main">
             <button class="mi-btn mi-btn--ghost" :disabled="uploading" @click="openUploadSheet(item)">上传影像</button>
             <button class="mi-btn mi-btn--primary" :disabled="!studyVolumeMap[item.id]" @click="open3DCombined(item.id)">3D 查看</button>
@@ -177,7 +173,7 @@ export default {
       return status || '\u5f85\u751f\u6210'
     },
     gtvStatusType() {
-      if (this.gtv.status === '已确认') return 'success'
+      if (this.gtv.status === '已确�?) return 'success'
       return this.hasGtvLabel ? 'success' : 'primary'
     },
     ctvStatusText() {
@@ -221,7 +217,7 @@ export default {
       return hasExpand ? 'success' : 'warning'
     },
     heatmapLabel() {
-      return this.ctv.confidenceMap || this.gtv.confidenceMap || '置信度范围'
+      return this.ctv.confidenceMap || this.gtv.confidenceMap || '置信度范�?
     },
     primaryStudyId() {
       return this.patient.studyId || this.studies?.[0]?.id || ''
@@ -239,15 +235,14 @@ export default {
       return !!(studyId && this.ctvExpandLabelMap?.[studyId])
     },
     isConfirmed() {
-      return this.patient.status === '已确认' || this.patient.confirmed === true
+      return this.patient.status === '\u5df2\u786e\u8ba4' || this.patient.confirmed === true
     },
     confirmButtonText() {
-      return this.isConfirmed ? '医生已确认' : '医生确认方案'
+      return this.isConfirmed ? '\u533b\u751f\u5df2\u786e\u8ba4' : '\u533b\u751f\u786e\u8ba4\u65b9\u6848'
     },
     confirmButtonType() {
       return this.isConfirmed ? 'success' : 'primary'
-    }
-  },
+    },
   async onLoad(query) {
     this.patientId = query.id || ''
     const cache = uni.getStorageSync('currentPatient')
@@ -255,7 +250,7 @@ export default {
       this.patientId = cache.id
     }
     if (!this.patientId) {
-      uni.showToast({ title: '缺少患者ID', icon: 'none' })
+      uni.showToast({ title: '\u7f3a\u5c11\u60a3\u8005ID', icon: 'none' })
       return
     }
     this.loadStudyFilesFromStorage()
@@ -277,15 +272,22 @@ export default {
       const map = {
         pending: '\u5f85\u5904\u7406',
         processing: '\u5904\u7406\u4e2d',
+        queued: '\u6392\u961f\u4e2d',
+        running: '\u5904\u7406\u4e2d',
+        in_progress: '\u5904\u7406\u4e2d',
         done: '\u5df2\u5b8c\u6210',
         completed: '\u5df2\u5b8c\u6210',
         success: '\u6210\u529f',
+        confirmed: '\u5df2\u786e\u8ba4',
+        review: '\u5f85\u590d\u6838',
         fail: '\u5931\u8d25',
         failed: '\u5931\u8d25'
       }
       if (!raw) return '\u5904\u7406\u4e2d'
-      if (raw.includes('processing')) return '\u5904\u7406\u4e2d'
-      return map[raw] || status
+      if (raw.includes('processing') || raw.includes('in_progress')) return '\u5904\u7406\u4e2d'
+      if (map[raw]) return map[raw]
+      if (/^[a-z_]+$/.test(raw)) return '\u5904\u7406\u4e2d'
+      return status
     },
     truncateText(value, maxLen = 10) {
       if (value === undefined || value === null) return ''
@@ -336,7 +338,7 @@ export default {
     },
     modalityTagText(studyId, modality) {
       const file = this.studyFileMap?.[studyId]?.[modality]
-      return file ? '已上传' : '未上传'
+      return file ? '已上�? : '未上�?
     },
     openUploadSheet(item) {
       this.activeUploadStudyId = item?.id || null
@@ -362,7 +364,7 @@ export default {
       })
       const labelUploaded = !!this.studyLabelMap?.[studyId] || !!this.studyFileMap?.[studyId]?.label
       actions.push({
-        name: labelUploaded ? `Label (已上传)` : 'Label',
+        name: labelUploaded ? `Label (已上�?` : 'Label',
         id: 'label'
       })
       return actions
@@ -371,7 +373,7 @@ export default {
       if (this.uploading) return
       const file = await this.pickFile()
       if (!file || !file.path) return
-      uni.showLoading({ title: '上传中...', mask: true })
+      uni.showLoading({ title: '上传�?..', mask: true })
       this.uploading = true
       try {
         let targetStudyId = this.activeUploadStudyId
@@ -526,7 +528,7 @@ export default {
     },
     open3DVolume(studyId) {
       if (!studyId || !this.studyVolumeMap?.[studyId]) {
-        uni.showToast({ title: '主体影像未上传', icon: 'none' })
+        uni.showToast({ title: '主体影像未上�?, icon: 'none' })
         return
       }
       uni.navigateTo({
@@ -535,7 +537,7 @@ export default {
     },
     open3DLabel(studyId) {
       if (!studyId || !this.studyLabelMap?.[studyId]) {
-        uni.showToast({ title: 'Label 未生成', icon: 'none' })
+        uni.showToast({ title: 'Label 未生�?, icon: 'none' })
         return
       }
       uni.navigateTo({
@@ -597,7 +599,7 @@ export default {
       try {
         const data = await downloadContour(this.patientId, target.id)
         const path = data.storagePath || data.modelPath || ''
-        uni.showToast({ title: path ? '已返回下载路径' : '已完成请求', icon: 'none' })
+        uni.showToast({ title: path ? '\u5df2\u8fd4\u56de\u4e0b\u8f7d\u8def\u5f84' : '\u5df2\u5b8c\u6210\uff0c\u8bf7\u7a0d\u540e\u67e5\u770b', icon: 'none' })
         if (path) {
           uni.setClipboardData({ data: path, success: () => {} })
         }
@@ -608,18 +610,18 @@ export default {
     confirmDeletePatient() {
       if (!this.patientId) return
       uni.showModal({
-        title: '删除患者',
-        content: '确认删除该患者及其影像序列吗？',
+        title: '\u5220\u9664\u60a3\u8005',
+        content: '\u786e\u8ba4\u5220\u9664\u8be5\u60a3\u8005\u53ca\u5176\u5f71\u50cf\u5e8f\u5217\u5417\uff1f',
         success: async (res) => {
           if (!res.confirm) return
           try {
             await deletePatient(this.patientId)
             uni.removeStorageSync('currentPatient')
-            uni.showToast({ title: '已删除', icon: 'success' })
+            uni.showToast({ title: '\u5df2\u5220\u9664', icon: 'success' })
             uni.navigateBack()
           } catch (err) {
             console.error('deletePatient error', err)
-            uni.showToast({ title: '删除失败', icon: 'none' })
+            uni.showToast({ title: '\u5220\u9664\u5931\u8d25', icon: 'none' })
           }
         }
       })
@@ -628,8 +630,8 @@ export default {
       const studyId = item?.id
       if (!studyId || !this.patientId) return
       uni.showModal({
-        title: '删除序列',
-        content: '确认删除该影像序列吗？',
+        title: '\u5220\u9664\u5e8f\u5217',
+        content: '\u786e\u8ba4\u5220\u9664\u8be5\u5f71\u50cf\u5e8f\u5217\u5417\uff1f',
         success: async (res) => {
           if (!res.confirm) return
           try {
@@ -639,10 +641,10 @@ export default {
             this.studyLabelMap = restLabels
             this.studyVolumeMap = restVolumes
             await Promise.all([this.fetchStudies(), this.fetchPatient()])
-            uni.showToast({ title: '已删除', icon: 'success' })
+            uni.showToast({ title: '\u5df2\u5220\u9664', icon: 'success' })
           } catch (err) {
             console.error('deleteStudy error', err)
-            uni.showToast({ title: '删除失败', icon: 'none' })
+            uni.showToast({ title: '\u5220\u9664\u5931\u8d25', icon: 'none' })
           }
         }
       })
@@ -655,7 +657,7 @@ export default {
       return new Promise((resolve) => {
         const choose = uni.chooseFile || uni.chooseMessageFile
         if (!choose) {
-          uni.showToast({ title: '当前端暂不支持文件选择', icon: 'none' })
+          uni.showToast({ title: '\u5f53\u524d\u7aef\u6682\u4e0d\u652f\u6301\u6587\u4ef6\u9009\u62e9', icon: 'none' })
           resolve(null)
           return
         }
@@ -683,7 +685,7 @@ export default {
       try {
         const data = await createStudy(this.patientId, {
           modality: this.guessModality(file?.name),
-          desc: file?.name || '新影像'
+          desc: file?.name || '新影�?
         })
         return data?.id
       } catch (err) {

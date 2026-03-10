@@ -1,11 +1,16 @@
-# IDE环境
+# IDE
 .vscode/
 
-# python环境
+# Python env
 .venv
 
-# 项目环境变量
+# Local env file
 .env
 
-# 编译产物
+# Build artifacts
 __pycache__/
+
+# CPDM runtime assets (release-only, do not commit)
+cpdm_model/
+cpdm_weights/
+data_storage/cpdm_outputs/

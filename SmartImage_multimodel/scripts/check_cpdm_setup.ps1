@@ -3,23 +3,12 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-
-Write-Host "Installing CPDM dependencies into env: $EnvName"
-
-$packages = @(
-    'omegaconf>=2.3.0',
-    'einops>=0.6.0',
-    'pytorch-lightning>=1.9.0,<2.1.0',
-    'segmentation-models-pytorch>=0.3.3,<0.4.0',
-    'torchvision>=0.15.0',
-    'tensorboard>=2.14.0'
-)
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 $pythonExe = "D:/tools/Miniconda/envs/$EnvName/python.exe"
 if (Test-Path $pythonExe) {
-    & $pythonExe -m pip install @packages
-    Write-Host 'Done.'
-    exit 0
+    & $pythonExe "$scriptDir\check_cpdm_setup.py"
+    exit $LASTEXITCODE
 }
 
 $condaExe = $null
@@ -35,5 +24,5 @@ if (-not $condaExe) {
     throw "conda not found and python exe for env '$EnvName' does not exist."
 }
 
-& $condaExe run -n $EnvName python -m pip install @packages
-Write-Host 'Done.'
+& $condaExe run -n $EnvName python "$scriptDir\check_cpdm_setup.py"
+exit $LASTEXITCODE

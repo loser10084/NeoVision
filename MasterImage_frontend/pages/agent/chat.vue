@@ -4,10 +4,10 @@
       <view class="safe-area hero-inner">
         <view class="hero-top">
           <view>
-            <text class="hero-title">灵犀智影AI助手与联合会诊</text>
+            <text class="hero-title">会诊中心与AI助手</text>
             <text class="hero-subtitle">支持智能问答、医生协作沟通与资料共享</text>
           </view>
-          <image class="hero-avatar" src="/static/project_icon.jpg" mode="aspectFill" />
+          <image class="hero-avatar" src="/static/project_icon_v2.jpg" mode="aspectFill" />
         </view>
       </view>
     </view>
@@ -19,7 +19,7 @@
             <text>AI</text>
           </view>
           <view class="quick-text">
-            <text class="quick-title">进入智能体对话</text>
+            <text class="quick-title">进入AI问答</text>
             <text class="quick-desc">勾画建议、流程问答、报告辅助</text>
           </view>
           <wd-icon name="arrow-right" size="18" color="#2f78d8" />
@@ -101,7 +101,7 @@
                 <text class="friend-pill-sub">{{ friend.hospital || '-' }} / {{ friend.dept || '-' }}</text>
               </view>
             </view>
-            <view v-else class="friend-empty">暂无好友，请先在“我的”页面添加</view>
+            <view v-else class="friend-empty" @click="openFriendsPage">暂无好友，点击前往“医生好友”页面</view>
           </view>
         </view>
 
@@ -156,6 +156,9 @@ export default {
     },
     openCreateDialog() {
       this.showCreateDialog = true
+    },
+    openFriendsPage() {
+      uni.navigateTo({ url: '/pages/patient/friends' })
     },
     closeCreateDialog() {
       this.showCreateDialog = false
@@ -239,8 +242,19 @@ export default {
     formatMeta(item) {
       const parts = []
       if (item?.patientId) parts.push(`患者ID: ${item.patientId}`)
-      parts.push(item?.status || 'ACTIVE')
+      parts.push(this.formatConsultStatus(item?.status))
       return parts.join(' · ')
+    },
+    formatConsultStatus(status) {
+      const key = String(status || '').trim().toUpperCase()
+      const map = {
+        ACTIVE: '进行中',
+        PENDING: '待处理',
+        PROCESSING: '处理中',
+        COMPLETED: '已完成',
+        CLOSED: '已关闭'
+      }
+      return map[key] || '进行中'
     },
     formatTime(value) {
       if (!value) return '-'

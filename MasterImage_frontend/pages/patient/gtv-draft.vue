@@ -41,9 +41,6 @@
             </text>
           </view>
         </view>
-        <view class="hint-bar">
-          <text class="subtle">建议先确认 Flair 上传，再执行基础分割；全模态齐全后可执行多模态分割。</text>
-        </view>
       </view>
 
       <view class="card block-card">

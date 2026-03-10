@@ -2,18 +2,18 @@
   <view class="page">
     <view class="safe-area">
       <view class="card">
-        <view class="section-title">3D Reconstruction</view>
+        <view class="section-title">3D重建</view>
         <view class="tips">
-          <text>Gesture: drag to rotate, wheel/pinch to zoom.</text>
+          <text>手势：拖动旋转，滚轮/双指缩放。</text>
         </view>
       </view>
 
       <view class="card">
-        <view class="section-title">Viewer</view>
+        <view class="section-title">三维查看</view>
         <view id="glwrap" class="gl-wrap">
           <view v-if="!isH5" class="placeholder">
             <text>
-              App side cannot access a native WebGL canvas here. Use H5/WebView or backend rendering.
+              当前端不支持直接创建 WebGL 画布，请在 H5 或 WebView 中查看。
             </text>
           </view>
           <view v-else-if="!glReady" class="placeholder">
@@ -23,7 +23,7 @@
 
         <view class="controls">
           <view class="control-row">
-            <text class="label">Threshold</text>
+            <text class="label">阈值</text>
             <slider
               :value="thresholdPercent"
               :min="0"
@@ -37,7 +37,7 @@
             <text class="value">{{ thresholdValueDisplay }}</text>
           </view>
           <view class="control-row">
-            <text class="label">Point size</text>
+            <text class="label">点大小</text>
             <slider
               :value="pointSize"
               :min="1"
@@ -50,7 +50,7 @@
             <text class="value">{{ pointSize }}</text>
           </view>
           <view class="control-row">
-            <text class="label">Opacity</text>
+            <text class="label">不透明度</text>
             <slider
               :value="brainAlphaPercent"
               :min="5"
@@ -63,7 +63,7 @@
             <text class="value">{{ brainAlphaPercent }}%</text>
           </view>
           <view class="control-row">
-            <text class="label">Max points</text>
+            <text class="label">最大点数</text>
             <slider
               :value="maxPoints"
               :min="20000"
@@ -77,10 +77,10 @@
           </view>
           <view class="action-bar">
             <wd-button shape="round" type="default" plain class="action-btn" @click="rebuildPoints" :disabled="!volume">
-              Rebuild
+              重建
             </wd-button>
             <wd-button shape="round" type="default" plain class="action-btn" @click="resetView" :disabled="!glReady">
-              Reset view
+              重置视角
             </wd-button>
           </view>
         </view>
@@ -581,7 +581,7 @@ export default {
       if (mode === 'label') {
         if (!this.labelUrl) {
           this.modelUrl = ''
-          this.setStatus('Label not available')
+          this.setStatus('暂无 Label 数据')
           return
         }
         this.modelUrl = this.labelUrl
@@ -641,7 +641,7 @@ export default {
       })
       // #endif
       if (!this.isH5) {
-        this.setStatus('App platform: WebGL disabled')
+      this.setStatus('当前平台不支持 WebGL')
       }
     },
     disposeViewer() {
@@ -674,7 +674,7 @@ export default {
       if (!this.canvas) return
       const gl = this.canvas.getContext('webgl', { antialias: true, preserveDrawingBuffer: true })
       if (!gl) {
-        this.setStatus('WebGL context unavailable')
+        this.setStatus('无法创建 WebGL 上下文')
         return
       }
       const vertexShader = this.compileShader(
@@ -725,7 +725,7 @@ void main() {
       gl.attachShader(program, fragmentShader)
       gl.linkProgram(program)
       if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-        this.setStatus(`Shader link failed: ${gl.getProgramInfoLog(program)}`)
+      this.setStatus(`着色器链接失败：${gl.getProgramInfoLog(program)}`)
         return
       }
       gl.useProgram(program)
@@ -738,14 +738,14 @@ void main() {
       this.program = program
       this.glReady = true
       this.autoLoadIfReady()
-      this.setStatus('WebGL ready')
+      this.setStatus('WebGL 已就绪')
     },
     compileShader(gl, type, source) {
       const shader = gl.createShader(type)
       gl.shaderSource(shader, source)
       gl.compileShader(shader)
       if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        this.setStatus(`Shader compile failed: ${gl.getShaderInfoLog(shader)}`)
+        this.setStatus(`着色器编译失败：${gl.getShaderInfoLog(shader)}`)
         return null
       }
       return shader
@@ -903,24 +903,24 @@ void main() {
       this.requestRender()
     },
     async loadSample() {
-      await this.loadNrrdFromUrl(DEFAULT_NRRD, 'Sample NRRD')
+      await this.loadNrrdFromUrl(DEFAULT_NRRD, '示例NRRD')
     },
     async loadFromModel() {
       if (!this.modelUrl) return
       if (this.labelUrl) {
-        await this.loadNrrdPair(this.modelUrl, this.labelUrl, 'Study NRRD + Label')
+        await this.loadNrrdPair(this.modelUrl, this.labelUrl, '序列NRRD+Label')
         return
       }
-      await this.loadNrrdFromUrl(this.modelUrl, 'Study NRRD')
+      await this.loadNrrdFromUrl(this.modelUrl, '序列NRRD')
     },
     async pickNrrd() {
       if (!this.isH5) {
-        uni.showToast({ title: 'Use H5 to pick file', icon: 'none' })
+        uni.showToast({ title: '请在H5端选择文件', icon: 'none' })
         return
       }
       const choose = uni.chooseFile || uni.chooseMessageFile
       if (!choose) {
-        uni.showToast({ title: 'File picker unavailable', icon: 'none' })
+        uni.showToast({ title: '当前环境不支持选文件', icon: 'none' })
         return
       }
       choose({
@@ -931,27 +931,27 @@ void main() {
           if (!file) return
           if (file.file && file.file.arrayBuffer) {
             const buffer = await file.file.arrayBuffer()
-            await this.loadNrrdFromBuffer(buffer, file.name || 'Picked NRRD')
-            return
+              await this.loadNrrdFromBuffer(buffer, file.name || '本地NRRD')
+              return
+            }
+            if (file.path) {
+              await this.loadNrrdFromUrl(file.path, file.name || '本地NRRD')
+            }
           }
-          if (file.path) {
-            await this.loadNrrdFromUrl(file.path, file.name || 'Picked NRRD')
-          }
-        }
-      })
+        })
     },
     async loadNrrdFromUrl(url, label) {
       if (!this.isH5) return
       try {
         this.loading = true
         const targetUrl = this.normalizeUrl(url)
-        this.setStatus(`Loading NRRD... (${targetUrl})`)
+        this.setStatus(`正在加载NRRD...（${targetUrl}）`)
         const buffer = await this.fetchArrayBuffer(targetUrl)
         await this.loadNrrdFromBuffer(buffer, label)
         this.sourceLabel = label
       } catch (err) {
         console.error('loadNrrdFromUrl failed', { url, err })
-        this.setStatus(`Load failed: ${err.message || err}`)
+        this.setStatus(`加载失败：${err.message || err}`)
       } finally {
         this.loading = false
       }
@@ -967,13 +967,13 @@ void main() {
         this.maxValue = max.toFixed(2)
         this.thresholdValue = min + 0.1 * (max - min)
         this.thresholdPercent = 10
-        this.setStatus('Building point cloud...')
+        this.setStatus('正在构建点云...')
         this.buildPointCloud()
         this.sourceLabel = label
-        this.setStatus('Render ready')
+        this.setStatus('渲染就绪')
       } catch (err) {
         console.error('loadNrrdFromBuffer failed', { label, err })
-        this.setStatus(`Parse failed: ${err.message || err}`)
+        this.setStatus(`解析失败：${err.message || err}`)
       }
     },
     async loadNrrdPair(flairUrl, labelUrl, label) {
@@ -982,21 +982,21 @@ void main() {
         this.loading = true
         const flairTarget = this.normalizeUrl(flairUrl)
         const labelTarget = this.normalizeUrl(labelUrl)
-        this.setStatus(`Loading NRRD... (${flairTarget})`)
+        this.setStatus(`正在加载NRRD...（${flairTarget}）`)
         const [flairBuffer, labelBuffer] = await Promise.all([
           this.fetchArrayBuffer(flairTarget),
           this.fetchArrayBuffer(labelTarget)
         ])
-        this.setStatus('Parsing Flair NRRD...')
+        this.setStatus('正在解析 Flair NRRD...')
         const flairVolume = await this.parseNrrdBuffer(flairBuffer)
-        this.setStatus('Parsing Label NRRD...')
+        this.setStatus('正在解析 Label NRRD...')
         const labelVolume = await this.parseNrrdBuffer(labelBuffer)
         if (
           flairVolume.dims.length < 3 ||
           labelVolume.dims.length < 3 ||
           flairVolume.dims.some((v, i) => v !== labelVolume.dims[i])
         ) {
-          this.setStatus('Label NRRD dims mismatch, showing Flair only')
+          this.setStatus('Label 维度不匹配，仅显示 Flair')
           this.labelVolume = null
         } else {
           this.labelVolume = labelVolume
@@ -1008,13 +1008,13 @@ void main() {
         this.maxValue = flairVolume.max.toFixed(2)
         this.thresholdValue = flairVolume.min + 0.1 * (flairVolume.max - flairVolume.min)
         this.thresholdPercent = 10
-        this.setStatus('Building point cloud...')
+        this.setStatus('正在构建点云...')
         this.buildPointCloud()
         this.sourceLabel = label
-        this.setStatus('Render ready')
+        this.setStatus('渲染就绪')
       } catch (err) {
         console.error('loadNrrdPair failed', { flairUrl, labelUrl, err })
-        this.setStatus(`Load failed: ${err.message || err}`)
+        this.setStatus(`加载失败：${err.message || err}`)
       } finally {
         this.loading = false
       }
@@ -1041,7 +1041,7 @@ void main() {
       if (targetUrl.startsWith('blob:')) {
         const response = await fetch(targetUrl)
         if (!response.ok) {
-          throw new Error(`Fetch failed: ${response.status}`)
+      throw new Error(`请求失败: ${response.status}`)
         }
         return response.arrayBuffer()
       }
@@ -1051,13 +1051,13 @@ void main() {
         console.error('uni.request arraybuffer failed', { url: targetUrl, err })
         const response = await fetch(targetUrl)
         if (!response.ok) {
-          throw new Error(`Fetch failed: ${response.status}`)
+      throw new Error(`请求失败: ${response.status}`)
         }
         return response.arrayBuffer()
       }
     },
     async parseNrrdBuffer(buffer) {
-      this.setStatus('Parsing NRRD header...')
+      this.setStatus('正在解析 NRRD 头...')
       const bytes = new Uint8Array(buffer)
       const headerEnd = findNrrdHeaderEnd(bytes)
       if (headerEnd < 0) {
@@ -1087,7 +1087,7 @@ void main() {
       const isAscii = encoding === 'ascii' || encoding === 'txt' || encoding === 'text'
       let payload = bytes.slice(headerEnd)
       if (!isAscii && (encoding === 'gzip' || encoding === 'gz' || encoding === 'deflate')) {
-        this.setStatus('Decompressing NRRD payload...')
+      this.setStatus('正在解压 NRRD 数据...')
         payload = await this.decompress(payload)
       } else if (!isAscii && encoding !== 'raw') {
         throw new Error(`Unsupported NRRD encoding: ${encoding}`)
@@ -1192,7 +1192,7 @@ void main() {
       } catch (err) {
         console.error('inflateRaw failed', { err })
       }
-      throw lastError || new Error('Decompression failed')
+      throw lastError || new Error('解压失败')
     },
     buildPointCloud() {
       if (!this.volume || !this.glReady) return

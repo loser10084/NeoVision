@@ -41,9 +41,6 @@
             </text>
           </view>
         </view>
-        <view class="hint-bar">
-          <text class="subtle">先上传或选择 GTV Label，再执行外扩分割；建议在多模态完整时执行。</text>
-        </view>
       </view>
 
       <view class="card block-card">
@@ -55,17 +52,17 @@
         <view class="workflow-strip">
           <view class="flow-step">
             <text class="flow-index">1</text>
-            <text class="flow-text">校验模态</text>
+            <text class="flow-text">模态检查</text>
           </view>
           <view class="flow-link"></view>
           <view class="flow-step">
             <text class="flow-index">2</text>
-            <text class="flow-text">上传 GTV Label</text>
+            <text class="flow-text">上传GTV</text>
           </view>
           <view class="flow-link"></view>
           <view class="flow-step">
             <text class="flow-index">3</text>
-            <text class="flow-text">生成外扩 Label</text>
+            <text class="flow-text">生成外扩</text>
           </view>
         </view>
 

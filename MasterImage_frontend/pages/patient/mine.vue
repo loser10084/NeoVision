@@ -29,48 +29,6 @@
         </view>
       </view>
 
-      <view class="card friends-card">
-        <view class="friends-head">
-          <text class="section-title section-title--small">医生好友</text>
-          <text class="friends-refresh" @click="refreshSocialData">刷新</text>
-        </view>
-
-        <view class="search-row">
-          <wd-input v-model="doctorKeyword" placeholder="姓名/手机号/医院/科室" @confirm="searchDoctor" />
-          <wd-button type="primary" size="small" :loading="searching" @click="searchDoctor">搜索</wd-button>
-        </view>
-
-        <view v-if="searchResults.length" class="search-results">
-          <view v-for="item in searchResults" :key="item.id" class="doctor-item">
-            <view class="doctor-left">
-              <text class="doctor-name">{{ item.name || `医生${item.id}` }}</text>
-              <text class="doctor-meta">{{ item.hospital || '-' }} / {{ item.dept || '-' }} / {{ item.mobile || '-' }}</text>
-            </view>
-            <wd-button
-              :type="item.friend ? 'success' : 'primary'"
-              size="small"
-              plain
-              :disabled="item.friend"
-              @click="handleAddFriend(item)"
-            >
-              {{ item.friend ? '已添加' : '添加' }}
-            </wd-button>
-          </view>
-        </view>
-
-        <view v-if="friendsLoading" class="state-line">正在加载好友列表...</view>
-        <view v-else-if="!friends.length" class="state-line">暂无好友，可通过上方搜索添加</view>
-        <view v-else class="friend-list">
-          <view v-for="item in friends" :key="item.id" class="doctor-item">
-            <view class="doctor-left">
-              <text class="doctor-name">{{ item.name || `医生${item.id}` }}</text>
-              <text class="doctor-meta">{{ item.hospital || '-' }} / {{ item.dept || '-' }} / {{ item.mobile || '-' }}</text>
-            </view>
-            <text class="remove-btn" @click="handleRemoveFriend(item)">删除</text>
-          </view>
-        </view>
-      </view>
-
       <view class="card settings-card">
         <view class="section-title section-title--small">快捷操作</view>
         <view class="setting-list">
@@ -91,7 +49,7 @@
 </template>
 
 <script>
-import { logout as logoutApi, listFriends, searchDoctors, addFriend, removeFriend, listConsultations } from '../../common/api'
+import { logout as logoutApi, listFriends, listConsultations } from '../../common/api'
 
 export default {
   data() {
@@ -108,11 +66,9 @@ export default {
       consultationsCount: 0,
       friends: [],
       friendsLoading: false,
-      searching: false,
-      doctorKeyword: '',
-      searchResults: [],
       actions: [
-        { key: 'consult', icon: '诊', title: '进入联合会诊', label: '在智能体页面查看会诊与聊天' },
+        { key: 'friends', icon: '友', title: '医生好友', label: '搜索、添加和管理好友' },
+        { key: 'consult', icon: '诊', title: '进入会诊中心', label: '查看联合会诊与AI问答' },
         { key: 'about', icon: '智', title: '关于灵犀智影', label: '面向放疗影像勾画的智能助手' },
         { key: 'logout', icon: '退', title: '退出登录', label: '返回登录页' }
       ]
@@ -148,56 +104,14 @@ export default {
         this.friendsLoading = false
       }
     },
-    async searchDoctor() {
-      const keyword = String(this.doctorKeyword || '').trim()
-      this.searching = true
-      try {
-        const result = await searchDoctors(keyword)
-        this.searchResults = Array.isArray(result) ? result : []
-      } catch (err) {
-        console.error('search doctor failed', err)
-      } finally {
-        this.searching = false
-      }
-    },
-    async handleAddFriend(item) {
-      if (!item || !item.id || item.friend) return
-      try {
-        await addFriend(item.id)
-        item.friend = true
-        await this.refreshSocialData()
-        uni.showToast({ title: '好友已添加', icon: 'success' })
-      } catch (err) {
-        console.error('add friend failed', err)
-      }
-    },
-    handleRemoveFriend(item) {
-      if (!item || !item.id) return
-      uni.showModal({
-        title: '提示',
-        content: `确认删除好友 ${item.name || ''} 吗？`,
-        success: async (res) => {
-          if (!res.confirm) return
-          try {
-            await removeFriend(item.id)
-            this.friends = this.friends.filter((friend) => Number(friend.id) !== Number(item.id))
-            this.searchResults = this.searchResults.map((doctor) => {
-              if (Number(doctor.id) === Number(item.id)) {
-                return { ...doctor, friend: false }
-              }
-              return doctor
-            })
-            uni.showToast({ title: '好友已删除', icon: 'success' })
-          } catch (err) {
-            console.error('remove friend failed', err)
-          }
-        }
-      })
-    },
     handleAction(item) {
       if (!item) return
       if (item.key === 'logout') {
         this.logout()
+        return
+      }
+      if (item.key === 'friends') {
+        uni.navigateTo({ url: '/pages/patient/friends' })
         return
       }
       if (item.key === 'consult') {
@@ -281,88 +195,9 @@ export default {
   color: #0c0d0f;
 }
 
-.friends-card {
-  margin-bottom: 18rpx;
-}
-
-.friends-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10rpx;
-}
-
-.friends-refresh {
-  font-size: 24rpx;
-  color: #2f78d8;
-}
-
 .section-title--small {
   margin-bottom: 0;
   font-size: 30rpx;
-}
-
-.search-row {
-  display: flex;
-  align-items: center;
-  gap: 10rpx;
-}
-
-.search-row :deep(.wd-input) {
-  flex: 1;
-}
-
-.search-results,
-.friend-list {
-  margin-top: 12rpx;
-  display: flex;
-  flex-direction: column;
-  gap: 10rpx;
-}
-
-.state-line {
-  margin-top: 12rpx;
-  font-size: 24rpx;
-  color: #7c98b8;
-  padding: 12rpx;
-  border: 1rpx dashed #d1e2f7;
-  border-radius: 14rpx;
-  background: #f8fbff;
-}
-
-.doctor-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10rpx;
-  border: 1rpx solid #d6e5f7;
-  border-radius: 16rpx;
-  padding: 12rpx 14rpx;
-  background: #f8fbff;
-}
-
-.doctor-left {
-  min-width: 0;
-  flex: 1;
-}
-
-.doctor-name {
-  display: block;
-  font-size: 28rpx;
-  color: #173a64;
-  font-weight: 650;
-}
-
-.doctor-meta {
-  display: block;
-  margin-top: 4rpx;
-  font-size: 22rpx;
-  color: #6a84a6;
-}
-
-.remove-btn {
-  color: #c14c4c;
-  font-size: 24rpx;
 }
 
 .setting-list {
