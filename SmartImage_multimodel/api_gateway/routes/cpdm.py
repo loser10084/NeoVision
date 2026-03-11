@@ -1,6 +1,6 @@
 from io import BytesIO
 
-from flask import Blueprint, jsonify, request, send_file
+from flask import Blueprint, jsonify, redirect, request, send_file
 
 from segmentation.cpdm_runner import (
     get_cpdm_job,
@@ -30,6 +30,9 @@ def cpdm_ct2pet_submit():
 
     sample_step = request.form.get("sampleStep", type=int)
     device = request.form.get("device", default="", type=str) or None
+    patient_id = request.form.get("patientId", type=int)
+    study_id = request.form.get("studyId", type=int)
+    auth_header = request.headers.get("Authorization", default="", type=str) or ""
 
     try:
         job = submit_cpdm_job(
@@ -37,7 +40,16 @@ def cpdm_ct2pet_submit():
             filename=file.filename or "ct.npy",
             sample_step=sample_step,
             device=device,
+            patient_id=patient_id,
+            study_id=study_id,
+            auth_header=auth_header,
         )
+    except PermissionError as exc:
+        logger.error(f"[cpdm] submit unauthorized: {exc}")
+        return jsonify({"error": str(exc)}), 401
+    except ValueError as exc:
+        logger.error(f"[cpdm] submit invalid request: {exc}")
+        return jsonify({"error": str(exc)}), 400
     except Exception as exc:
         logger.error(f"[cpdm] submit failed: {exc}")
         return jsonify({"error": str(exc)}), 500
@@ -82,6 +94,14 @@ def cpdm_output(job_id: str, filename: str):
 
     target = resolve_cpdm_output(job_id, filename)
     if target is None:
+        result = get_cpdm_result(job_id)
+        pet_png_url = ""
+        if isinstance(result, dict):
+            result_obj = result.get("result")
+            if isinstance(result_obj, dict):
+                pet_png_url = str(result_obj.get("petPngUrl") or "").strip()
+        if pet_png_url.startswith("http://") or pet_png_url.startswith("https://"):
+            return redirect(pet_png_url, code=302)
         return jsonify({"error": "not found"}), 404
 
     return send_file(

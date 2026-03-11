@@ -78,14 +78,14 @@
         </view>
 
         <view class="section-head">
-          <text class="section-name">方案模板推荐</text>
-          <text class="section-more">查看更多</text>
+          <text class="section-name">{{ '\u6559\u5b66\u65b9\u6848\u6a21\u677f' }}</text>
+          <text class="section-more">{{ '\u70b9\u51fb\u4f53\u9a8c' }}</text>
         </view>
         <scroll-view class="doctor-scroll" scroll-x>
           <view class="doctor-row">
-            <view v-for="doctor in doctors" :key="doctor.id" class="doctor-card">
+            <view v-for="doctor in doctors" :key="doctor.id" class="doctor-card" @click="handleTemplate(doctor)">
               <view class="doctor-top">
-                <text class="doctor-follow">模板</text>
+                <text class="doctor-follow">{{ '\u6559\u5b66' }}</text>
               </view>
               <view class="doctor-avatar-mini">{{ doctor.initial }}</view>
               <text class="doctor-name">{{ doctor.name }}</text>
@@ -151,10 +151,30 @@ export default {
         { key: 'consult', title: '会诊中心', icon: '/static/icons/ic-ai-consult.svg' }
       ],
       doctors: [
-        { id: 't1', name: '脑胶质瘤模板', dept: 'GTV v3.2', initial: '脑' },
-        { id: 't2', name: '鼻咽癌模板', dept: 'CTV v2.4', initial: '鼻' },
-        { id: 't3', name: '肺部肿瘤模板', dept: '多模态 v1.9', initial: '肺' },
-        { id: 't4', name: '颅脑复核模板', dept: 'RTStruct v2.1', initial: '颅' }
+        {
+          id: 'brain',
+          name: '\u8111\u6559\u5b66\u6a21\u677f',
+          dept: '\u5355\u6587\u4ef6 NRRD',
+          initial: '\u8111'
+        },
+        {
+          id: 'nasopharynx',
+          name: '\u9f3b\u54bd\u6559\u5b66\u6a21\u677f',
+          dept: '\u5f00\u53d1\u4e2d',
+          initial: '\u9f3b'
+        },
+        {
+          id: 'lung',
+          name: '\u80ba\u90e8\u6559\u5b66\u6a21\u677f',
+          dept: '\u5f00\u53d1\u4e2d',
+          initial: '\u80ba'
+        },
+        {
+          id: 'review',
+          name: '\u590d\u6838\u6559\u5b66\u6a21\u677f',
+          dept: '\u5f00\u53d1\u4e2d',
+          initial: '\u590d'
+        }
       ]
     }
   },
@@ -271,6 +291,14 @@ export default {
     goWorkbenchTask() {
       this.handleSearch()
       uni.showToast({ title: '已刷新待处理病例', icon: 'none' })
+    },
+    handleTemplate(item) {
+      if (!item) return
+      if (item.id === 'brain') {
+        uni.navigateTo({ url: '/pages/patient/teaching-brain' })
+        return
+      }
+      uni.showToast({ title: '\u6b63\u5728\u5f00\u53d1\u4e2d...', icon: 'none' })
     },
     handleService(item) {
       if (!item) return
@@ -801,4 +829,3 @@ export default {
   }
 }
 </style>
-

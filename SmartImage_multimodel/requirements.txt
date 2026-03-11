@@ -15,6 +15,7 @@ pillow>=9.0.0
 # Web 妗嗘灦
 flask==3.0.3
 python-dotenv==1.0.1
+requests>=2.31.0
 
 # =========================
 # LangChain 鐢熸€佺郴缁燂紙鏃х増鏈級

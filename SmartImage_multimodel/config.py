@@ -50,6 +50,12 @@ CPDM_TIMEOUT_SECONDS = int(os.getenv("CPDM_TIMEOUT_SECONDS", "1800"))
 CPDM_MPLCONFIGDIR = os.getenv("CPDM_MPLCONFIGDIR", "")
 CPDM_KEEP_JOB_DIR = os.getenv("CPDM_KEEP_JOB_DIR", "false").lower() == "true"
 
+# Backend storage relay (model service -> backend upload -> OSS)
+MODEL_OUTPUT_STORAGE = os.getenv("MODEL_OUTPUT_STORAGE", "oss").strip().lower()
+BACKEND_API_BASE_URL = os.getenv("BACKEND_API_BASE_URL", "http://127.0.0.1:8080")
+BACKEND_UPLOAD_TIMEOUT_SECONDS = int(os.getenv("BACKEND_UPLOAD_TIMEOUT_SECONDS", "120"))
+BACKEND_SERVICE_BEARER_TOKEN = os.getenv("BACKEND_SERVICE_BEARER_TOKEN", "")
+
 # Model names and runtime options
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
 IMAGE_MODEL_NAME = os.getenv("IMAGE_MODEL_NAME", "gpt-5-mini")

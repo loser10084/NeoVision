@@ -173,7 +173,7 @@ export default {
       return status || '\u5f85\u751f\u6210'
     },
     gtvStatusType() {
-      if (this.gtv.status === '已确�?) return 'success'
+      if (this.gtv.status === '\u5df2\u786e\u8ba4') return 'success'
       return this.hasGtvLabel ? 'success' : 'primary'
     },
     ctvStatusText() {
@@ -217,7 +217,7 @@ export default {
       return hasExpand ? 'success' : 'warning'
     },
     heatmapLabel() {
-      return this.ctv.confidenceMap || this.gtv.confidenceMap || '置信度范�?
+      return this.ctv.confidenceMap || this.gtv.confidenceMap || '\u7f6e\u4fe1\u5ea6\u8303\u56f4'
     },
     primaryStudyId() {
       return this.patient.studyId || this.studies?.[0]?.id || ''
@@ -243,6 +243,7 @@ export default {
     confirmButtonType() {
       return this.isConfirmed ? 'success' : 'primary'
     },
+  },
   async onLoad(query) {
     this.patientId = query.id || ''
     const cache = uni.getStorageSync('currentPatient')
@@ -338,7 +339,7 @@ export default {
     },
     modalityTagText(studyId, modality) {
       const file = this.studyFileMap?.[studyId]?.[modality]
-      return file ? '已上�? : '未上�?
+      return file ? '\u5df2\u4e0a\u4f20' : '\u672a\u4e0a\u4f20'
     },
     openUploadSheet(item) {
       this.activeUploadStudyId = item?.id || null
@@ -364,7 +365,7 @@ export default {
       })
       const labelUploaded = !!this.studyLabelMap?.[studyId] || !!this.studyFileMap?.[studyId]?.label
       actions.push({
-        name: labelUploaded ? `Label (已上�?` : 'Label',
+        name: labelUploaded ? `Label (\u5df2\u4e0a\u4f20)` : 'Label',
         id: 'label'
       })
       return actions
@@ -373,7 +374,7 @@ export default {
       if (this.uploading) return
       const file = await this.pickFile()
       if (!file || !file.path) return
-      uni.showLoading({ title: '上传�?..', mask: true })
+      uni.showLoading({ title: '\u4e0a\u4f20\u4e2d...', mask: true })
       this.uploading = true
       try {
         let targetStudyId = this.activeUploadStudyId
@@ -528,7 +529,7 @@ export default {
     },
     open3DVolume(studyId) {
       if (!studyId || !this.studyVolumeMap?.[studyId]) {
-        uni.showToast({ title: '主体影像未上�?, icon: 'none' })
+        uni.showToast({ title: '\u4e3b\u4f53\u5f71\u50cf\u672a\u4e0a\u4f20', icon: 'none' })
         return
       }
       uni.navigateTo({
@@ -537,7 +538,7 @@ export default {
     },
     open3DLabel(studyId) {
       if (!studyId || !this.studyLabelMap?.[studyId]) {
-        uni.showToast({ title: 'Label 未生�?, icon: 'none' })
+        uni.showToast({ title: 'Label \u672a\u751f\u6210', icon: 'none' })
         return
       }
       uni.navigateTo({
@@ -685,7 +686,7 @@ export default {
       try {
         const data = await createStudy(this.patientId, {
           modality: this.guessModality(file?.name),
-          desc: file?.name || '新影�?
+          desc: file?.name || '\u65b0\u5f71\u50cf'
         })
         return data?.id
       } catch (err) {

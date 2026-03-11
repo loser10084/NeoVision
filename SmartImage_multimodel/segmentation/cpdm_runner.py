@@ -17,6 +17,7 @@ import yaml
 from PIL import Image
 
 import config
+from utils.backend_storage import ensure_storage_context, upload_output_bytes, use_backend_storage
 from utils import logger
 
 _CPDM_OUTPUT_ROOT = Path(config.BASE_DIR) / "data_storage" / "cpdm_outputs"
@@ -32,6 +33,8 @@ _INPUT_SAMPLE_NAME = "000000"
 class CPDMJob:
     job_id: str
     sample_step: int
+    patient_id: int | None = None
+    study_id: int | None = None
     status: str = "queued"
     progress: int = 0
     message: str = "queued"
@@ -67,9 +70,19 @@ def submit_cpdm_job(
     *,
     sample_step: int | None = None,
     device: str | None = None,
+    patient_id: int | None = None,
+    study_id: int | None = None,
+    auth_header: str | None = None,
 ) -> dict[str, Any]:
     if not ct_payload:
         raise ValueError("empty file")
+
+    backend_mode = use_backend_storage()
+    storage_via_backend = backend_mode and bool(patient_id) and bool(study_id)
+    if storage_via_backend:
+        ensure_storage_context(patient_id, study_id)
+    elif backend_mode:
+        logger.warning("[cpdm] missing patientId/studyId, fallback to local output storage")
 
     runtime = _resolve_runtime(sample_step=sample_step, device=device)
 
@@ -77,6 +90,8 @@ def submit_cpdm_job(
     job = CPDMJob(
         job_id=job_id,
         sample_step=runtime.sample_step,
+        patient_id=patient_id,
+        study_id=study_id,
         status="queued",
         progress=0,
         message="queued",
@@ -86,7 +101,7 @@ def submit_cpdm_job(
 
     thread = threading.Thread(
         target=_run_cpdm_job,
-        args=(job_id, ct_payload, filename, runtime),
+        args=(job_id, ct_payload, filename, runtime, patient_id, study_id, (auth_header or "").strip()),
         daemon=True,
         name=f"cpdm-job-{job_id}",
     )
@@ -131,6 +146,7 @@ def _load_cpdm_job_from_disk(job_id: str) -> dict[str, Any] | None:
     created_at = job_dir.stat().st_ctime
     updated_at = job_dir.stat().st_mtime
     sample_step = int(config.CPDM_SAMPLE_STEP)
+    result_payload: dict[str, Any] | None = None
 
     meta_path = job_dir / "meta.json"
     if meta_path.is_file():
@@ -138,8 +154,23 @@ def _load_cpdm_job_from_disk(job_id: str) -> dict[str, Any] | None:
             meta = json.loads(meta_path.read_text(encoding="utf-8"))
             created_at = float(meta.get("createdAt", created_at))
             sample_step = int(meta.get("sampleStep", sample_step))
+            result_obj = meta.get("result")
+            if isinstance(result_obj, dict):
+                result_payload = dict(result_obj)
         except Exception as exc:
             logger.warning(f"[cpdm] failed to parse meta for job={job_id}: {exc}")
+
+    if result_payload:
+        return {
+            "jobId": job_id,
+            "status": "completed",
+            "progress": 100,
+            "message": "completed",
+            "createdAt": created_at,
+            "updatedAt": updated_at,
+            "sampleStep": sample_step,
+            "result": result_payload,
+        }
 
     pet_png = job_dir / "pet.png"
     if pet_png.is_file():
@@ -189,6 +220,10 @@ def _serialize_job(job: CPDMJob) -> dict[str, Any]:
         "updatedAt": job.updated_at,
         "sampleStep": job.sample_step,
     }
+    if job.patient_id:
+        payload["patientId"] = int(job.patient_id)
+    if job.study_id:
+        payload["studyId"] = int(job.study_id)
     if job.error:
         payload["error"] = job.error
     if job.output:
@@ -506,10 +541,25 @@ def _resolve_existing_path(raw_path: str | None, *, expect_file: bool = False, e
         return resolved
     return None
 
-def _run_cpdm_job(job_id: str, ct_payload: bytes, filename: str, runtime: CPDMRuntime) -> None:
+def _run_cpdm_job(
+    job_id: str,
+    ct_payload: bytes,
+    filename: str,
+    runtime: CPDMRuntime,
+    patient_id: int | None,
+    study_id: int | None,
+    auth_header: str,
+) -> None:
     work_dir = _CPDM_JOB_WORK_ROOT / job_id
     output_dir = _CPDM_OUTPUT_ROOT / job_id
     try:
+        backend_mode = use_backend_storage()
+        storage_via_backend = backend_mode and bool(patient_id) and bool(study_id)
+        if storage_via_backend:
+            ensure_storage_context(patient_id, study_id)
+        elif backend_mode:
+            logger.warning(f"[cpdm] job {job_id} missing patientId/studyId, use local output storage")
+
         if work_dir.exists():
             shutil.rmtree(work_dir, ignore_errors=True)
         work_dir.mkdir(parents=True, exist_ok=True)
@@ -565,32 +615,94 @@ def _run_cpdm_job(job_id: str, ct_payload: bytes, filename: str, runtime: CPDMRu
             shutil.rmtree(output_dir, ignore_errors=True)
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        final_pet_npy = output_dir / "pet.npy"
-        final_pet_png = output_dir / "pet.png"
-        final_attention = output_dir / "attention.npy"
-        final_ct = output_dir / "ct_input.npy"
         final_meta = output_dir / "meta.json"
-
-        shutil.copy2(str(pet_npy), str(final_pet_npy))
-        shutil.copy2(str(attention_out), str(final_attention))
-        np.save(str(final_ct), ct_prepared)
-        _npy_to_png(final_pet_npy, final_pet_png)
-
-        meta = {
+        result_payload: dict[str, Any]
+        meta: dict[str, Any] = {
             "jobId": job_id,
             "sampleStep": runtime.sample_step,
             "createdAt": time.time(),
             "inputFile": filename,
-            "resultNpy": str(final_pet_npy.name),
-            "resultPng": str(final_pet_png.name),
-            "attentionNpy": str(final_attention.name),
         }
-        final_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
 
-        result_payload = {
-            "petPngUrl": f"/api/cpdm/outputs/{job_id}/pet.png",
-            "sampleStep": runtime.sample_step,
-        }
+        if storage_via_backend:
+            pet_npy_bytes = pet_npy.read_bytes()
+            attention_bytes = attention_out.read_bytes()
+            ct_input_bytes = _array_to_npy_bytes(ct_prepared)
+            pet_png_bytes = _npy_to_png_bytes(pet_npy)
+
+            pet_png_upload = upload_output_bytes(
+                patient_id=int(patient_id),
+                study_id=int(study_id),
+                filename=f"{job_id}_pet.png",
+                file_type="cpdm.pet.png",
+                content=pet_png_bytes,
+                auth_header=auth_header,
+            )
+            pet_npy_upload = upload_output_bytes(
+                patient_id=int(patient_id),
+                study_id=int(study_id),
+                filename=f"{job_id}_pet.npy",
+                file_type="cpdm.pet.npy",
+                content=pet_npy_bytes,
+                auth_header=auth_header,
+            )
+            attention_upload = upload_output_bytes(
+                patient_id=int(patient_id),
+                study_id=int(study_id),
+                filename=f"{job_id}_attention.npy",
+                file_type="cpdm.attention.npy",
+                content=attention_bytes,
+                auth_header=auth_header,
+            )
+            ct_input_upload = upload_output_bytes(
+                patient_id=int(patient_id),
+                study_id=int(study_id),
+                filename=f"{job_id}_ct_input.npy",
+                file_type="cpdm.ct_input.npy",
+                content=ct_input_bytes,
+                auth_header=auth_header,
+            )
+            result_payload = {
+                "petPngUrl": pet_png_upload.file_path,
+                "petNpyUrl": pet_npy_upload.file_path,
+                "attentionNpyUrl": attention_upload.file_path,
+                "ctInputNpyUrl": ct_input_upload.file_path,
+                "sampleStep": runtime.sample_step,
+                "storage": "oss",
+            }
+            meta.update(
+                {
+                    "storage": "oss",
+                    "result": result_payload,
+                }
+            )
+        else:
+            final_pet_npy = output_dir / "pet.npy"
+            final_pet_png = output_dir / "pet.png"
+            final_attention = output_dir / "attention.npy"
+            final_ct = output_dir / "ct_input.npy"
+
+            shutil.copy2(str(pet_npy), str(final_pet_npy))
+            shutil.copy2(str(attention_out), str(final_attention))
+            np.save(str(final_ct), ct_prepared)
+            _npy_to_png(final_pet_npy, final_pet_png)
+
+            result_payload = {
+                "petPngUrl": f"/api/cpdm/outputs/{job_id}/pet.png",
+                "sampleStep": runtime.sample_step,
+                "storage": "local",
+            }
+            meta.update(
+                {
+                    "storage": "local",
+                    "resultNpy": str(final_pet_npy.name),
+                    "resultPng": str(final_pet_png.name),
+                    "attentionNpy": str(final_attention.name),
+                    "result": result_payload,
+                }
+            )
+
+        final_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
         _set_job(
             job_id,
             status="completed",
@@ -791,7 +903,17 @@ def _locate_result_npy(result_root: Path, sample_step: int) -> Path:
     raise FileNotFoundError(f"CPDM result npy not found under {result_root}")
 
 
+def _array_to_npy_bytes(arr: np.ndarray) -> bytes:
+    buf = BytesIO()
+    np.save(buf, arr)
+    return buf.getvalue()
+
+
 def _npy_to_png(npy_path: Path, out_png: Path) -> None:
+    out_png.write_bytes(_npy_to_png_bytes(npy_path))
+
+
+def _npy_to_png_bytes(npy_path: Path) -> bytes:
     arr = np.asarray(np.load(str(npy_path), allow_pickle=True), dtype=np.float32).squeeze()
     if arr.ndim != 2:
         raise ValueError(f"Result npy must be 2D after squeeze, got shape={arr.shape}")
@@ -803,7 +925,9 @@ def _npy_to_png(npy_path: Path, out_png: Path) -> None:
         norm = np.clip((arr - lo) / (hi - lo), 0.0, 1.0)
 
     image = Image.fromarray((norm * 255.0).astype(np.uint8), mode="L")
-    image.save(str(out_png))
+    buf = BytesIO()
+    image.save(buf, format="PNG")
+    return buf.getvalue()
 
 
 def _to_posix(path: Path) -> str:

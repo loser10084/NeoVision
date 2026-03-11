@@ -92,7 +92,7 @@
 
 <script>
 import { getModel } from '../../common/api'
-import { resolveStudyResourceUrl } from '../../common/request'
+import { resolveModelUrl, resolveStudyResourceUrl } from '../../common/request'
 
 const NRRD_TYPES = {
   'uchar': { bytes: 1, ctor: Uint8Array },
@@ -551,7 +551,12 @@ export default {
     this.viewMode = String(query.view || query.mode || 'both').toLowerCase()
     if (this.studyId) {
       await this.fetchModel()
+      return
     }
+    this.modelUrl = this.normalizeIncomingUrl(query.volumeUrl || query.modelUrl || '')
+    this.labelUrl = this.normalizeIncomingUrl(query.labelUrl || '')
+    this.heatmapUrl = this.normalizeIncomingUrl(query.heatmapUrl || '')
+    this.applyViewMode()
   },
   onReady() {
     this.initViewer()
@@ -616,6 +621,17 @@ export default {
       if (!raw) return ''
       if (/^https?:\/\//i.test(raw)) return raw
       return resolveStudyResourceUrl(raw)
+    },
+    normalizeIncomingUrl(raw) {
+      if (!raw) return ''
+      let target = raw
+      try {
+        target = decodeURIComponent(String(raw))
+      } catch (err) {
+        target = String(raw)
+      }
+      if (/^https?:\/\//i.test(target)) return target
+      return resolveModelUrl(target)
     },
     autoLoadIfReady() {
       if (!this.isH5 || !this.glReady || this.autoLoaded) return

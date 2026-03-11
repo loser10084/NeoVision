@@ -380,6 +380,7 @@ export default {
         uni.uploadFile({
           url: resolveModelUrl(endpoint),
           files: fileList,
+          formData: this.buildStorageFormData(),
           header: token ? { Authorization: `Bearer ${token}` } : {},
           success: (res) => {
             try {
@@ -410,6 +411,9 @@ export default {
       form.append('t1', t1Blob, files.t1?.name || 't1.nrrd')
       form.append('t1c', t1cBlob, files.t1c?.name || 't1c.nrrd')
       form.append('t2', t2Blob, files.t2?.name || 't2.nrrd')
+      const storageMeta = this.buildStorageFormData()
+      if (storageMeta.patientId) form.append('patientId', storageMeta.patientId)
+      if (storageMeta.studyId) form.append('studyId', storageMeta.studyId)
       const token = getToken()
       const res = await fetch(resolveModelUrl(endpoint), {
         method: 'POST',
@@ -444,6 +448,12 @@ export default {
           fail: () => resolve('')
         })
       })
+    },
+    buildStorageFormData() {
+      const formData = {}
+      if (this.patientId) formData.patientId = String(this.patientId)
+      if (this.activeStudyId) formData.studyId = String(this.activeStudyId)
+      return formData
     },
     async syncContourResult(labelUrl) {
       if (!this.patientId || !this.activeStudyId || !labelUrl) return

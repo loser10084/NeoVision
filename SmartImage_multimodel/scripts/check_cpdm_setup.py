@@ -18,7 +18,8 @@ REQUIRED_MODULES = [
     'einops',
     'pytorch_lightning',
     'segmentation_models_pytorch',
-    'nrrd'
+    'nrrd',
+    'requests',
 ]
 
 

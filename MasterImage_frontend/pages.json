@@ -107,6 +107,14 @@
       }
     },
     {
+      "path": "pages/patient/teaching-brain",
+      "style": {
+        "navigationBarTitleText": "脑教学模板",
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTextStyle": "black"
+      }
+    },
+    {
       "path": "pages/patient/friends",
       "style": {
         "navigationBarTitleText": "医生好友",
