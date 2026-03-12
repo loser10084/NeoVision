@@ -4,31 +4,31 @@
       <view class="ctv-hero">
         <view class="hero-main">
           <view>
-            <text class="hero-title">{{ '热力图与CPDM工作台' }}</text>
-            <text class="hero-subtitle">{{ '多模态热力图生成与CPDM预测' }}</text>
+            <text class="hero-title">热力图与 CPDM 工作台</text>
+            <text class="hero-subtitle">多模态热力图生成与 CPDM 预测</text>
           </view>
           <view class="hero-badge">AI</view>
         </view>
         <view class="hero-metrics">
           <view class="metric-item">
             <text class="metric-value">{{ activeStudyId || '-' }}</text>
-            <text class="metric-label">{{ '当前序列' }}</text>
+            <text class="metric-label">当前序列</text>
           </view>
           <view class="metric-item">
             <text class="metric-value">{{ readyModalityCount }}/{{ modalityOrder.length }}</text>
-            <text class="metric-label">{{ '模态就绪' }}</text>
+            <text class="metric-label">模态就绪</text>
           </view>
           <view class="metric-item">
             <text class="metric-value">{{ heatmapUrl ? '已生成' : '未生成' }}</text>
-            <text class="metric-label">{{ '热力图状态' }}</text>
+            <text class="metric-label">热力图状态</text>
           </view>
         </view>
       </view>
 
       <view class="card block-card">
         <view class="section-header section-header--edge">
-          <text class="section-title">{{ '序列与模态检查' }}</text>
-          <button class="mi-btn mi-btn--ghost" @click="openStudyPicker">{{ '切换序列' }}</button>
+          <text class="section-title">序列与模态检查</text>
+          <button class="mi-btn mi-btn--ghost" @click="openStudyPicker">切换序列</button>
         </view>
         <view class="study-modalities">
           <view v-for="modality in modalityOrder" :key="modality" class="modality-item">
@@ -45,7 +45,7 @@
 
       <view class="card block-card">
         <view class="section-header">
-          <text class="section-title">{{ '热力图生成' }}</text>
+          <text class="section-title">热力图生成</text>
           <text class="status-pill" :class="heatmapUrl ? 'status-pill--success' : 'status-pill--warning'">
             {{ heatmapUrl ? '可下载' : '待生成' }}
           </text>
@@ -54,25 +54,25 @@
         <view class="workflow-strip">
           <view class="flow-step">
             <text class="flow-index">1</text>
-            <text class="flow-text">{{ '检查模态' }}</text>
+            <text class="flow-text">检查模态</text>
           </view>
           <view class="flow-link"></view>
           <view class="flow-step">
             <text class="flow-index">2</text>
-            <text class="flow-text">{{ '生成热图' }}</text>
+            <text class="flow-text">生成热力图</text>
           </view>
           <view class="flow-link"></view>
           <view class="flow-step">
             <text class="flow-index">3</text>
-            <text class="flow-text">{{ '下载归档' }}</text>
+            <text class="flow-text">下载归档</text>
           </view>
         </view>
 
         <view class="segment-actions">
-          <button class="mi-btn mi-btn--primary" :disabled="processing || !hasAllModalities" @click="generateHeatmap">
+          <button class="mi-btn mi-btn--primary" :disabled="processing || !hasFlair" @click="generateHeatmap">
             {{ processing ? '生成中...' : '生成热力图' }}
           </button>
-          <button class="mi-btn mi-btn--ghost" :disabled="!heatmapUrl" @click="downloadHeatmap">{{ '下载热力图' }}</button>
+          <button class="mi-btn mi-btn--ghost" :disabled="!heatmapUrl" @click="downloadHeatmap">下载热力图</button>
         </view>
 
         <view v-if="heatmapUrl" class="preview">
@@ -82,23 +82,20 @@
 
       <view class="card block-card">
         <view class="section-header">
-          <text class="section-title">{{ 'CPDM ' + '预测' }}</text>
+          <text class="section-title">CPDM 预测</text>
           <text class="status-pill" :class="`status-pill--${cpdmStatusType}`">{{ cpdmStatusText }}</text>
         </view>
         <view class="cpdm-source">
           <view class="cpdm-source-main">
             <text class="subtle">{{ cpdmSourceText }}</text>
-            <button class="mi-btn mi-btn--ghost mi-btn--mini" :disabled="cpdmProcessing || !cpdmSelectableFiles.length" @click="pickCpdmSource">
-              {{ '选择文件' }}
-            </button>
           </view>
-          <text v-if="!cpdmSelectedFile" class="subtle subtle--weak">{{ '请先在当前序列中选择一个已上传文件' }}</text>
+          <text v-if="!cpdmSelectedFile" class="subtle subtle--weak">当前序列暂无可用输入文件</text>
         </view>
         <view class="segment-actions">
           <button class="mi-btn mi-btn--primary" :disabled="cpdmProcessing || !cpdmSelectedFile" @click="submitCpdm">
             {{ cpdmProcessing ? '处理中...' : '上传' }}
           </button>
-          <button class="mi-btn mi-btn--ghost" :disabled="!cpdmPngUrl" @click="openCpdmPng">{{ '下载图片' }}</button>
+          <button class="mi-btn mi-btn--ghost" :disabled="!cpdmPngUrl" @click="openCpdmPng">下载图片</button>
         </view>
 
         <view v-if="cpdmPngUrl" class="preview">
@@ -113,7 +110,7 @@
 </template>
 
 <script>
-import { getStudiesByPatient } from '../../common/api'
+import { getStudiesByPatient, getStudyArtifactsLatest } from '../../common/api'
 import { resolveModelUrl, getToken } from '../../common/request'
 
 export default {
@@ -129,13 +126,17 @@ export default {
       processing: false,
       cpdmSubmitting: false,
       cpdmPollingTimer: null,
-      isH5: false
+      isH5: false,
+      artifactsSyncDisabled: false
     }
   },
   computed: {
     readyModalityCount() {
       if (!this.activeStudyId) return 0
       return this.modalityOrder.reduce((count, modality) => count + (this.getModalityFile(this.activeStudyId, modality) ? 1 : 0), 0)
+    },
+    hasFlair() {
+      return !!this.getModalityFile(this.activeStudyId, 'flair')
     },
     hasAllModalities() {
       return this.modalityOrder.every((m) => !!this.getModalityFile(this.activeStudyId, m))
@@ -170,17 +171,20 @@ export default {
       return this.cpdmEntry?.selectedKey || ''
     },
     cpdmSelectedFile() {
-      if (!this.cpdmSelectedKey) return null
-      return this.cpdmSelectableFiles.find((item) => item.key === this.cpdmSelectedKey) || null
+      if (this.cpdmSelectedKey) {
+        const selected = this.cpdmSelectableFiles.find((item) => item.key === this.cpdmSelectedKey)
+        if (selected) return selected
+      }
+      return this.pickPreferredCpdmSource()
     },
     cpdmSourceText() {
       if (this.cpdmSelectedFile) {
-        return `已选：${this.cpdmSelectedFile.label} / ${this.cpdmSelectedFile.name}`
+        return `默认输入：${this.cpdmSelectedFile.label} / ${this.cpdmSelectedFile.name}`
       }
       if (!this.cpdmSelectableFiles.length) {
         return '当前序列暂无可用输入文件'
       }
-      return '请选择输入文件'
+      return '将按默认规则自动选择输入文件'
     },
     cpdmPngUrl() {
       return this.cpdmEntry?.petPngUrl || ''
@@ -216,13 +220,18 @@ export default {
     }
     this.isH5 = typeof window !== 'undefined' && typeof document !== 'undefined'
     if (!this.patientId) {
-      uni.showToast({ title: '缺少患者ID', icon: 'none' })
+      uni.showToast({ title: '缂哄皯鎮ｈ€匢D', icon: 'none' })
       return
     }
     this.loadStudyFilesFromStorage()
     this.loadHeatmapFromStorage()
     this.loadCpdmFromStorage()
     await this.fetchStudies()
+    await this.refreshArtifactsFromServer()
+    this.resumeCpdmPollingIfNeeded()
+  },
+  async onShow() {
+    await this.refreshArtifactsFromServer()
     this.resumeCpdmPollingIfNeeded()
   },
   onUnload() {
@@ -303,37 +312,131 @@ export default {
         console.error('getStudies error', err)
       }
     },
+    async refreshArtifactsFromServer() {
+      if (this.artifactsSyncDisabled || !this.activeStudyId) return
+      try {
+        const payload = await getStudyArtifactsLatest(this.activeStudyId)
+        const data = this.unwrapResultPayload(payload)
+        const heatmap = data?.heatmap || null
+        const cpdm = data?.cpdm || null
+
+        if (heatmap?.filePath) {
+          const url = this.safeResolveModelUrl(heatmap.filePath)
+          if (url) {
+            this.heatmapMap = {
+              ...(this.heatmapMap || {}),
+              [this.activeStudyId]: {
+                ...(this.heatmapMap?.[this.activeStudyId] || {}),
+                name: 'confidence.png',
+                filePath: url,
+                localPath: ''
+              }
+            }
+            this.saveHeatmapToStorage()
+          }
+        }
+
+        if (cpdm?.petPngPath) {
+          const url = this.safeResolveModelUrl(cpdm.petPngPath)
+          if (url) {
+            const current = this.cpdmEntry || {}
+            const nextStatus = current.status === 'running' || current.status === 'queued' ? current.status : 'completed'
+            this.cpdmMap = {
+              ...(this.cpdmMap || {}),
+              [this.activeStudyId]: {
+                ...current,
+                petPngUrl: url,
+                status: nextStatus,
+                message: nextStatus === 'completed' ? '已同步最新结果' : (current.message || ''),
+                error: nextStatus === 'completed' ? '' : (current.error || '')
+              }
+            }
+            this.saveCpdmToStorage()
+          }
+        }
+      } catch (err) {
+        if (this.isArtifactsApiUnavailable(err)) {
+          this.artifactsSyncDisabled = true
+          return
+        }
+        console.error('sync artifacts failed', err)
+      }
+    },
+    unwrapResultPayload(payload) {
+      if (payload && typeof payload === 'object' && payload.data && typeof payload.data === 'object') {
+        return payload.data
+      }
+      return payload && typeof payload === 'object' ? payload : {}
+    },
+    safeResolveModelUrl(path) {
+      if (!path || typeof path !== 'string') return ''
+      try {
+        return resolveModelUrl(path)
+      } catch (err) {
+        if (/^https?:\/\//i.test(path)) return path
+        return ''
+      }
+    },
+    isArtifactsApiUnavailable(err) {
+      const code = Number(err?.code || err?.statusCode || 0)
+      const text = `${err?.message || ''} ${err?.error || ''}`.toLowerCase()
+      if (code === 404) return true
+      if ((code === 500 || code === 501) && (text.includes('no static resource') || text.includes('not found') || text.includes('no handler'))) {
+        return true
+      }
+      return false
+    },
+    pickPreferredCpdmSource() {
+      if (!this.cpdmSelectableFiles.length) return null
+      const priority = ['flair', 't1', 't1c', 't2']
+      for (const key of priority) {
+        const matched = this.cpdmSelectableFiles.find((item) => item.key === key)
+        if (matched) return matched
+      }
+      return this.cpdmSelectableFiles[0] || null
+    },
     openStudyPicker() {
       if (!this.studies.length) return
       const itemList = this.studies.map((study) => '序列 ' + study.id)
       uni.showActionSheet({
         itemList,
-        success: ({ tapIndex }) => {
+        success: async ({ tapIndex }) => {
           const study = this.studies[tapIndex]
           if (!study?.id) return
           this.activeStudyId = study.id
+          await this.refreshArtifactsFromServer()
           this.resumeCpdmPollingIfNeeded()
         }
       })
     },
+    buildHeatmapInputFiles() {
+      if (!this.activeStudyId) return null
+      const flair = this.getModalityFile(this.activeStudyId, 'flair')
+      if (!flair) return null
+      return {
+        flair,
+        t1: this.getModalityFile(this.activeStudyId, 't1') || flair,
+        t1c: this.getModalityFile(this.activeStudyId, 't1c') || flair,
+        t2: this.getModalityFile(this.activeStudyId, 't2') || flair
+      }
+    },
     async generateHeatmap() {
-      if (!this.hasAllModalities || !this.activeStudyId) {
-        uni.showToast({ title: '缺少多模态数据', icon: 'none' })
+      if (!this.hasFlair || !this.activeStudyId) {
+        uni.showToast({ title: '缺少 Flair 数据', icon: 'none' })
         return
       }
       if (this.processing) return
       this.processing = true
       uni.showLoading({ title: '处理中...', mask: true })
       try {
-        const files = {
-          flair: this.getModalityFile(this.activeStudyId, 'flair'),
-          t1: this.getModalityFile(this.activeStudyId, 't1'),
-          t1c: this.getModalityFile(this.activeStudyId, 't1c'),
-          t2: this.getModalityFile(this.activeStudyId, 't2')
+        const files = this.buildHeatmapInputFiles()
+        if (!files) {
+          throw new Error('missing flair input')
         }
         const result = await this.uploadMultimodalForHeatmap(files)
-        if (result?.downloadUrl) {
-          const url = resolveModelUrl(result.downloadUrl)
+        const outputPath = result?.downloadUrl || result?.filePath || ''
+        const url = this.safeResolveModelUrl(outputPath)
+        if (url) {
           this.heatmapMap = {
             ...(this.heatmapMap || {}),
             [this.activeStudyId]: {
@@ -344,10 +447,15 @@ export default {
           }
           this.saveHeatmapToStorage()
         }
-        uni.showToast({ title: '完成', icon: 'success' })
+        if (!url) {
+          throw new Error('missing heatmap output path')
+        }
+        await this.refreshArtifactsFromServer()
+        uni.showToast({ title: '已完成', icon: 'success' })
       } catch (err) {
         console.error('generate heatmap error', err)
-        uni.showToast({ title: '模型服务未就绪', icon: 'none' })
+        const tip = typeof err?.message === 'string' && err.message ? err.message : '热力图生成失败'
+        uni.showToast({ title: tip, icon: 'none' })
       } finally {
         this.processing = false
         uni.hideLoading()
@@ -388,12 +496,12 @@ export default {
 
       const selected = this.cpdmSelectedFile
       if (!selected) {
-        uni.showToast({ title: '请先选择输入文件', icon: 'none' })
+        uni.showToast({ title: '褰撳墠搴忓垪鏆傛棤鍙敤杈撳叆鏂囦欢', icon: 'none' })
         return
       }
 
       this.cpdmSubmitting = true
-      uni.showLoading({ title: '提交中...', mask: true })
+      uni.showLoading({ title: '鎻愪氦涓?..', mask: true })
       try {
         const file = await this.prepareCpdmUploadFile(selected)
         const payload = await this.uploadCpdmFile(file)
@@ -426,38 +534,6 @@ export default {
         this.cpdmSubmitting = false
         uni.hideLoading()
       }
-    },
-    pickCpdmSource() {
-      if (!this.activeStudyId) return
-      if (!this.cpdmSelectableFiles.length) {
-        uni.showToast({ title: '当前序列暂无可用文件', icon: 'none' })
-        return
-      }
-      const itemList = this.cpdmSelectableFiles.map((item) => `${item.label} - ${item.name}`)
-      uni.showActionSheet({
-        itemList,
-        success: ({ tapIndex }) => {
-          const selected = this.cpdmSelectableFiles[tapIndex]
-          if (!selected) return
-          const next = {
-            ...(this.cpdmEntry || {}),
-            selectedKey: selected.key,
-            selectedName: selected.name,
-            inputName: selected.name,
-            jobId: '',
-            status: 'idle',
-            progress: 0,
-            message: '',
-            error: '',
-            petPngUrl: ''
-          }
-          this.cpdmMap = {
-            ...(this.cpdmMap || {}),
-            [this.activeStudyId]: next
-          }
-          this.saveCpdmToStorage()
-        }
-      })
     },
     async prepareCpdmUploadFile(selected) {
       const name = selected?.name || `${selected?.key || 'ct'}.nrrd`
@@ -553,6 +629,9 @@ export default {
         this.saveCpdmToStorage()
         if (status === 'completed' || status === 'failed') {
           this.stopCpdmPolling()
+          if (status === 'completed') {
+            await this.refreshArtifactsFromServer()
+          }
         }
       } catch (err) {
         console.error('cpdm status error', err)
@@ -604,16 +683,16 @@ export default {
         window.open(url)
         return
       }
-      uni.showLoading({ title: '下载中...', mask: true })
+      uni.showLoading({ title: '涓嬭浇涓?..', mask: true })
       uni.downloadFile({
         url,
         success: () => {
           uni.hideLoading()
-          uni.showToast({ title: '下载成功', icon: 'success' })
+          uni.showToast({ title: '涓嬭浇鎴愬姛', icon: 'success' })
         },
         fail: () => {
           uni.hideLoading()
-          uni.showToast({ title: '下载失败', icon: 'none' })
+          uni.showToast({ title: '涓嬭浇澶辫触', icon: 'none' })
         }
       })
     },
@@ -622,14 +701,15 @@ export default {
       const t1Path = await this.resolveLocalPath(files.t1)
       const t1cPath = await this.resolveLocalPath(files.t1c)
       const t2Path = await this.resolveLocalPath(files.t2)
-      if (!flairPath || !t1Path || !t1cPath || !t2Path) {
+      const allPaths = [flairPath, t1Path, t1cPath, t2Path]
+      if (allPaths.some((p) => typeof p !== 'string' || !p.trim())) {
         throw new Error('Missing local file')
       }
       const fileList = [
-        { name: 'flair', filePath: flairPath },
-        { name: 't1', filePath: t1Path },
-        { name: 't1c', filePath: t1cPath },
-        { name: 't2', filePath: t2Path }
+        { name: 'flair', filePath: flairPath, uri: flairPath },
+        { name: 't1', filePath: t1Path, uri: t1Path },
+        { name: 't1c', filePath: t1cPath, uri: t1cPath },
+        { name: 't2', filePath: t2Path, uri: t2Path }
       ]
       const token = getToken()
       return new Promise((resolve, reject) => {
@@ -641,11 +721,11 @@ export default {
           success: (res) => {
             try {
               const payload = typeof res.data === 'string' ? JSON.parse(res.data) : res.data
-              if (payload?.error) {
+              if (payload?.error || payload?.code > 0) {
                 reject(payload)
                 return
               }
-              resolve(payload)
+              resolve(this.unwrapResultPayload(payload))
             } catch (e) {
               reject(e)
             }
@@ -677,15 +757,29 @@ export default {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       })
       const payload = await res.json().catch(() => null)
-      if (!res.ok || !payload || payload.error) {
+      if (!res.ok || !payload || payload.error || payload?.code > 0) {
         throw payload || new Error(`HTTP ${res.status}`)
       }
-      return payload
+      return this.unwrapResultPayload(payload)
+    },
+    extractPathValue(value) {
+      if (!value) return ''
+      if (typeof value === 'string') return value.trim()
+      if (typeof value === 'object') {
+        const nested = value.localPath || value.filePath || value.path || value.url || value.downloadUrl || ''
+        if (typeof nested === 'string') return nested.trim()
+      }
+      return ''
     },
     async fetchBlob(file) {
       if (!file) return null
       if (file.fileObj) return file.fileObj
-      const target = file.filePath || file.localPath || ''
+      const target =
+        this.extractPathValue(file.filePath) ||
+        this.extractPathValue(file.localPath) ||
+        this.extractPathValue(file.path) ||
+        this.extractPathValue(file.url) ||
+        this.extractPathValue(file.downloadUrl)
       if (!target) return null
       const res = await fetch(target)
       if (!res.ok) return null
@@ -693,9 +787,16 @@ export default {
     },
     async resolveLocalPath(file) {
       if (!file) return ''
-      const local = file.localPath || ''
+      const local =
+        this.extractPathValue(file.localPath) ||
+        this.extractPathValue(file.tempFilePath) ||
+        this.extractPathValue(file.path)
       if (local && !/^https?:\/\//i.test(local)) return local
-      const remote = file.filePath || ''
+      const remote =
+        this.extractPathValue(file.filePath) ||
+        this.extractPathValue(file.url) ||
+        this.extractPathValue(file.downloadUrl) ||
+        local
       if (!remote || !/^https?:\/\//i.test(remote)) return remote
       return new Promise((resolve) => {
         uni.downloadFile({
@@ -888,7 +989,7 @@ export default {
   font-weight: 600;
 }
 
-.segment-actions .mi-btn--primary[disabled] {
+.mi-btn--primary[disabled] {
   opacity: 1;
   background: #dce9f9;
   border-color: #c3d8f3;
@@ -897,7 +998,7 @@ export default {
   -webkit-text-fill-color: currentColor;
 }
 
-.segment-actions .mi-btn--ghost[disabled] {
+.mi-btn--ghost[disabled] {
   opacity: 1;
   background: #f4f8fd;
   border-color: #d9e6f7;
@@ -1070,14 +1171,17 @@ export default {
 }
 
 .mi-btn[disabled] {
-  opacity: 0.55;
+  opacity: 1;
   box-shadow: none;
+  -webkit-text-fill-color: currentColor;
 }
 
 button::after {
   border: none;
 }
 </style>
+
+
 
 
 

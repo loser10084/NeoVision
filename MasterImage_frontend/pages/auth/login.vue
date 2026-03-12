@@ -11,7 +11,7 @@
         </view>
         <view class="hero-chips">
           <text class="hero-chip">影像管理</text>
-          <text class="hero-chip">AI勾画</text>
+          <text class="hero-chip">AI 勾画</text>
           <text class="hero-chip">医生复核</text>
         </view>
       </view>
@@ -31,7 +31,7 @@
 
         <wd-form ref="formRef" :model="form" :rules="rules">
           <view class="field">
-            <text class="field-label">账户</text>
+            <text class="field-label">账号</text>
             <wd-input
               v-model="form.username"
               prop="username"
@@ -115,6 +115,7 @@ export default {
             }, 260)
           } catch (err) {
             console.error('login failed', err)
+            uni.showToast({ title: this.resolveLoginError(err), icon: 'none' })
           } finally {
             this.loading = false
           }
@@ -122,6 +123,25 @@ export default {
         .catch(() => {
           uni.showToast({ title: '请检查账号和密码', icon: 'none' })
         })
+    },
+    resolveLoginError(err) {
+      const code = Number(err?.code || err?.statusCode || 0)
+      const text = `${err?.message || ''} ${err?.error || ''}`.toLowerCase()
+      if (
+        code === 401 ||
+        text.includes('unauthorized') ||
+        text.includes('credential') ||
+        text.includes('password') ||
+        text.includes('账号') ||
+        text.includes('密码') ||
+        text.includes('凭证')
+      ) {
+        return '账号或密码错误'
+      }
+      if (typeof err?.message === 'string' && err.message.trim()) {
+        return err.message.trim()
+      }
+      return '登录失败，请稍后重试'
     },
     goRegister() {
       uni.navigateTo({ url: '/pages/auth/register' })

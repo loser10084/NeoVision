@@ -1,8 +1,8 @@
 import { request, requestModel, setAuth, clearAuth, resolveModelUrl, resolveApiUrl, getToken } from './request'
 
-// 认证
+// Auth
 export function login(payload) {
-  return request({ url: '/api/auth/login', method: 'POST', data: payload }).then((data) => {
+  return request({ url: '/api/auth/login', method: 'POST', data: payload, showError: false }).then((data) => {
     setAuth(data.token, data.user)
     return data
   })
@@ -16,7 +16,7 @@ export function logout() {
   clearAuth()
 }
 
-// 患者
+// Patients
 export function getPatients(keyword = '') {
   return request({ url: '/api/patients', method: 'GET', data: keyword ? { keyword } : {} })
 }
@@ -41,7 +41,7 @@ export function reviewPatient(id, confirmed = true) {
   return request({ url: `/api/patients/${id}/review`, method: 'POST', data: { confirmed } })
 }
 
-// 序列/影像
+// Studies / imaging
 export function getStudiesByPatient(id) {
   return request({ url: `/api/patients/${id}/studies`, method: 'GET' })
 }
@@ -58,7 +58,7 @@ export function deleteStudy(id, studyId) {
   return request({ url: `/api/patients/${id}/studies/${studyId}`, method: 'DELETE' })
 }
 
-// 直传返回 fileId/filePath（如需）
+// Direct upload returns fileId/filePath (optional)
 export function uploadStudyFile(id, studyId, payload) {
   return request({ url: `/api/patients/${id}/studies/${studyId}/upload`, method: 'POST', data: payload })
 }
@@ -75,7 +75,7 @@ export function segmentStudyMultimodal(studyId, payload) {
   return request({ url: `/api/studies/${studyId}/segment/multimodal`, method: 'POST', data: payload })
 }
 
-// AI 结果/分区
+// AI contour results
 export function getContours(id) {
   return request({ url: `/api/patients/${id}/contours`, method: 'GET' })
 }
@@ -96,7 +96,7 @@ export function upsertContour(id, payload) {
   return request({ url: `/api/patients/${id}/contours/upsert`, method: 'POST', data: payload })
 }
 
-// 文件与 3D 模型
+// Files and 3D models
 export function getFile(fileId) {
   return request({ url: `/api/files/${fileId}`, method: 'GET' })
 }
@@ -109,6 +109,10 @@ export function getModel(studyId) {
   return request({ url: `/api/studies/${studyId}/model`, method: 'GET' })
 }
 
+export function getStudyArtifactsLatest(studyId) {
+  return request({ url: `/api/studies/${studyId}/artifacts/latest`, method: 'GET', showError: false })
+}
+
 export function submitCtvExpand(payload) {
   return requestModel({
     url: '/api/ctv/expand',
@@ -118,7 +122,7 @@ export function submitCtvExpand(payload) {
   })
 }
 
-// 智能体对话
+// Agent chat
 export function sendAgentMessage(payload) {
   const data = typeof payload === 'string' ? { prompt: payload } : payload
   return requestModel({ url: '/api/agent/chat', method: 'POST', data })
@@ -159,7 +163,8 @@ export function sendAgentMessageWithImage(prompt, imagePath) {
 export function getAgentHistory() {
   return requestModel({ url: '/api/agent/history', method: 'GET' })
 }
-// 社交/联合会诊
+
+// Social / consultation
 export function searchDoctors(keyword = '') {
   return request({ url: '/api/patients/social/doctors', method: 'GET', data: keyword ? { keyword } : {} })
 }
@@ -167,11 +172,9 @@ export function searchDoctors(keyword = '') {
 export function listFriends() {
   return request({ url: '/api/patients/social/friends', method: 'GET' })
 }
-
 export function addFriend(friendId) {
   return request({ url: `/api/patients/social/friends/${friendId}`, method: 'POST' })
 }
-
 export function removeFriend(friendId) {
   return request({ url: `/api/patients/social/friends/${friendId}`, method: 'DELETE' })
 }
@@ -268,6 +271,7 @@ export default {
   getFile,
   deleteFile,
   getModel,
+  getStudyArtifactsLatest,
   submitCtvExpand,
   sendAgentMessage,
   sendAgentMessageWithImage,
@@ -285,6 +289,3 @@ export default {
   sendConsultationMessage,
   uploadConsultationAttachment
 }
-
-
-

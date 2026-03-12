@@ -758,9 +758,28 @@ export default {
   color: #305377;
 }
 
-.mi-btn[disabled] {
-  opacity: 0.55;
+.mi-btn--primary[disabled] {
+  opacity: 1;
+  background: #dce9f9;
+  border-color: #c3d8f3;
+  color: #3b5f88;
   box-shadow: none;
+  -webkit-text-fill-color: currentColor;
+}
+
+.mi-btn--ghost[disabled] {
+  opacity: 1;
+  background: #f4f8fd;
+  border-color: #d9e6f7;
+  color: #6b86a8;
+  box-shadow: none;
+  -webkit-text-fill-color: currentColor;
+}
+
+.mi-btn[disabled] {
+  opacity: 1;
+  box-shadow: none;
+  -webkit-text-fill-color: currentColor;
 }
 
 button::after {

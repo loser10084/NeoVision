@@ -10,6 +10,7 @@ import com.yunchuan.smartimage_backend.service.ModelService;
 import com.yunchuan.smartimage_backend.service.StudyService;
 import com.yunchuan.smartimage_backend.utils.AliOssUtil;
 import com.yunchuan.smartimage_backend.vo.ModelVO;
+import com.yunchuan.smartimage_backend.vo.StudyArtifactsVO;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.MediaType;
@@ -46,6 +47,11 @@ public class ModelController {
     @GetMapping("/{studyId}/model")
     public ApiResponse<ModelVO> getModel(@PathVariable("studyId") Long studyId) {
         return ApiResponse.success(modelService.getModel(studyId));
+    }
+
+    @GetMapping("/{studyId}/artifacts/latest")
+    public ApiResponse<StudyArtifactsVO> getLatestArtifacts(@PathVariable("studyId") Long studyId) {
+        return ApiResponse.success(modelService.getLatestArtifacts(studyId));
     }
 
     @GetMapping("/{studyId}/download/volume")

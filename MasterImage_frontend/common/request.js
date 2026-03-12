@@ -146,8 +146,13 @@ export function clearAuth() {
   uni.removeStorageSync('userProfile')
 }
 
+function isAuthWhiteUrl(url = '') {
+  const target = String(url || '')
+  return AUTH_WHITE_LIST.some((path) => target.startsWith(path))
+}
+
 function needAuth(url) {
-  return !AUTH_WHITE_LIST.some((path) => url.startsWith(path))
+  return !isAuthWhiteUrl(url)
 }
 
 function buildHeaders(url, extraHeaders = {}) {
@@ -200,8 +205,14 @@ export function request({ url, method = 'GET', data = {}, header = {}, showError
         const { statusCode } = res
         const payload = parsePayload(res)
         if (statusCode === 401 || payload?.code === 401) {
-          handleAuthFailure()
-          reject(new Error('Unauthorized'))
+          if (!isAuthWhiteUrl(url)) {
+            handleAuthFailure()
+            reject(new Error('Unauthorized'))
+            return
+          }
+          const authErr = payload && typeof payload === 'object' ? payload : { code: 401, message: '账号或密码错误' }
+          showError && uni.showToast({ title: authErr.message || '账号或密码错误', icon: 'none' })
+          reject(authErr)
           return
         }
         if (!payload || payload.code === undefined) {

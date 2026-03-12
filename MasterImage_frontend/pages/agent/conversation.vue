@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <view class="page">
     <view class="header">
       <view class="back" @click="goBack">
@@ -52,11 +52,12 @@
       <view
         v-for="message in messages"
         :key="message.id"
-        :id="String(message.id)"
+        :id="toAnchorId(message.id)"
         class="message"
         :class="message.self ? 'user' : 'other'"
       >
-        <image class="avatar" :class="message.self ? 'user' : 'other'" :src="message.self ? userAvatar : agentAvatar" mode="aspectFill" />
+        <view v-if="message.self" class="avatar avatar--mine">{{ userInitial }}</view>
+        <image v-else class="avatar" :src="agentAvatar" mode="aspectFill" />
 
         <view class="bubble-wrap">
           <view class="bubble" :class="message.self ? 'user' : 'other'">
@@ -151,7 +152,7 @@ export default {
       input: '',
       loading: false,
       scrollTarget: '',
-      userAvatar: '/static/project_icon_v2.jpg',
+      userName: '医生',
       agentAvatar: '/static/project_icon_v2.jpg',
       pendingAttachment: null,
       messages: [],
@@ -180,6 +181,11 @@ export default {
     addableFriends() {
       const current = new Set((this.members || []).map((m) => Number(m.doctorId)))
       return (this.friends || []).filter((friend) => !current.has(Number(friend.id)))
+    },
+    userInitial() {
+      const name = String(this.userName || '').trim()
+      if (!name) return '医'
+      return name.slice(0, 1)
     }
   },
   async onLoad(options) {
@@ -213,26 +219,8 @@ export default {
       }
       const name = profile?.name ? String(profile.name).trim() : ''
       if (name) {
-        this.userAvatar = this.buildInitialsAvatar(name)
+        this.userName = name
       }
-    },
-    buildInitialsAvatar(name) {
-      const initial = name.slice(0, 1)
-      const size = 120
-      if (typeof document === 'undefined') return this.userAvatar
-      const canvas = document.createElement('canvas')
-      canvas.width = size
-      canvas.height = size
-      const ctx = canvas.getContext('2d')
-      if (!ctx) return this.userAvatar
-      ctx.fillStyle = '#0f1012'
-      ctx.fillRect(0, 0, size, size)
-      ctx.fillStyle = '#ffffff'
-      ctx.font = 'bold 64px sans-serif'
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      ctx.fillText(initial, size / 2, size / 2 + 2)
-      return canvas.toDataURL('image/png')
     },
     async loadAiHistory() {
       try {
@@ -579,9 +567,15 @@ export default {
       this.$nextTick(() => {
         const target = id || (this.messages.length ? this.messages[this.messages.length - 1].id : '')
         if (target !== undefined && target !== null) {
-          this.scrollTarget = String(target)
+          this.scrollTarget = this.toAnchorId(target)
         }
       })
+    },
+    toAnchorId(id) {
+      const raw = String(id ?? '').trim()
+      if (!raw) return ''
+      const normalized = raw.replace(/[^a-zA-Z0-9_-]/g, '_')
+      return normalized.startsWith('msg-') ? normalized : `msg-${normalized}`
     },
     extractFileName(path) {
       if (!path) return ''
@@ -787,7 +781,7 @@ export default {
 .message-list {
   flex: 1;
   min-height: 0;
-  padding: 12rpx 20rpx 8rpx;
+  padding: 12rpx 24rpx 8rpx;
 }
 
 .message {
@@ -803,6 +797,7 @@ export default {
 
 .message.user {
   margin-left: auto;
+  margin-right: 30rpx;
   flex-direction: row-reverse;
 }
 
@@ -813,6 +808,18 @@ export default {
   background: #d6e5f7;
   flex-shrink: 0;
   border: 1rpx solid #cde0f7;
+}
+
+.avatar--mine {
+  background: linear-gradient(145deg, #2f78d8 0%, #5da4f0 100%);
+  box-shadow: 0 10rpx 20rpx rgba(47, 120, 216, 0.3);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  font-weight: 700;
+  border: 1rpx solid rgba(255, 255, 255, 0.38);
 }
 
 .bubble-wrap {

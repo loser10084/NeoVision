@@ -11,7 +11,12 @@
       <view class="card">
         <view class="section-title">三维查看</view>
         <view id="glwrap" class="gl-wrap">
-          <view v-if="!isH5" class="placeholder">
+          <!-- #ifdef APP-PLUS -->
+          <web-view class="gl-webview" :src="appWebViewSrc" />
+          <!-- #endif -->
+
+          <!-- #ifndef APP-PLUS -->
+          <view v-if="!runtimeSupported" class="placeholder">
             <text>
               当前端不支持直接创建 WebGL 画布，请在 H5 或 WebView 中查看。
             </text>
@@ -19,6 +24,7 @@
           <view v-else-if="!glReady" class="placeholder">
             <text>{{ statusText }}</text>
           </view>
+          <!-- #endif -->
         </view>
 
         <view class="controls">
@@ -92,7 +98,7 @@
 
 <script>
 import { getModel } from '../../common/api'
-import { resolveModelUrl, resolveStudyResourceUrl } from '../../common/request'
+import { resolveModelUrl, resolveStudyResourceUrl, getEffectiveServiceUrls, getToken } from '../../common/request'
 
 const NRRD_TYPES = {
   'uchar': { bytes: 1, ctor: Uint8Array },
@@ -500,7 +506,8 @@ export default {
       labelUrl: '',
       heatmapUrl: '',
       sourceLabel: '-',
-      isH5: false,
+      appWebViewSrc: '',
+      runtimeSupported: false,
       statusText: 'Idle',
       loading: false,
       glReady: false,
@@ -549,6 +556,10 @@ export default {
   async onLoad(query) {
     this.studyId = query.studyId || ''
     this.viewMode = String(query.view || query.mode || 'both').toLowerCase()
+    // #ifdef APP-PLUS
+    this.appWebViewSrc = this.buildAppWebViewSrc(query)
+    return
+    // #endif
     if (this.studyId) {
       await this.fetchModel()
       return
@@ -559,10 +570,14 @@ export default {
     this.applyViewMode()
   },
   onReady() {
+    // #ifndef APP-PLUS
     this.initViewer()
+    // #endif
   },
   onUnload() {
+    // #ifndef APP-PLUS
     this.disposeViewer()
+    // #endif
   },
   methods: {
     async fetchModel() {
@@ -634,7 +649,7 @@ export default {
       return resolveModelUrl(target)
     },
     autoLoadIfReady() {
-      if (!this.isH5 || !this.glReady || this.autoLoaded) return
+      if (!this.runtimeSupported || !this.glReady || this.autoLoaded) return
       if (!this.modelUrl) return
       this.autoLoaded = true
       this.loadFromModel()
@@ -642,9 +657,45 @@ export default {
     setStatus(message) {
       this.statusText = message
     },
+    getRuntimeWindow() {
+      if (typeof window !== 'undefined') return window
+      if (typeof globalThis !== 'undefined') return globalThis
+      return null
+    },
+    buildAppWebViewSrc(query = {}) {
+      const urls = getEffectiveServiceUrls()
+      const token = getToken() || ''
+      const payload = {
+        studyId: query.studyId || this.studyId || '',
+        view: query.view || query.mode || this.viewMode || 'both',
+        volumeUrl: query.volumeUrl || query.modelUrl || '',
+        labelUrl: query.labelUrl || '',
+        heatmapUrl: query.heatmapUrl || '',
+        gatewayUrl: urls.gatewayUrl || '',
+        modelUrl: urls.modelUrl || '',
+        token
+      }
+      const queryString = Object.keys(payload)
+        .filter((key) => payload[key] !== undefined && payload[key] !== null && String(payload[key]) !== '')
+        .map((key) => encodeURIComponent(key) + '=' + encodeURIComponent(String(payload[key])))
+        .join('&')
+      return queryString ? '/hybrid/html/model-viewer/index.html?' + queryString : '/hybrid/html/model-viewer/index.html'
+    },
     initViewer() {
       // #ifdef H5
-      this.isH5 = true
+      this.runtimeSupported = true
+      // #endif
+      // #ifdef APP-PLUS
+      this.runtimeSupported = true
+      // #endif
+      if (!this.runtimeSupported) {
+        this.setStatus('\u5f53\u524d\u5e73\u53f0\u4e0d\u652f\u6301 WebGL')
+        return
+      }
+      if (typeof document === 'undefined') {
+        this.setStatus('\u5f53\u524d\u8fd0\u884c\u73af\u5883\u4e0d\u652f\u6301 3D \u753b\u5e03')
+        return
+      }
       this.$nextTick(() => {
         this.createCanvas()
         this.initWebGL()
@@ -655,16 +706,11 @@ export default {
           this.loadSample()
         }
       })
-      // #endif
-      if (!this.isH5) {
-      this.setStatus('当前平台不支持 WebGL')
-      }
     },
     disposeViewer() {
-      if (this.resizeHandler) {
-        // #ifdef H5
-        window.removeEventListener('resize', this.resizeHandler)
-        // #endif
+      const runtimeWindow = this.getRuntimeWindow()
+      if (this.resizeHandler && runtimeWindow) {
+        runtimeWindow.removeEventListener('resize', this.resizeHandler)
       }
       this.inputHandlers.forEach(({ type, handler }) => {
         if (this.canvas) {
@@ -845,7 +891,10 @@ void main() {
       ]
 
       this.resizeHandler = () => this.resizeCanvas()
-      window.addEventListener('resize', this.resizeHandler)
+      const runtimeWindow = this.getRuntimeWindow()
+      if (runtimeWindow) {
+        runtimeWindow.addEventListener('resize', this.resizeHandler)
+      }
     },
     getPinchDistance(event) {
       const dx = event.touches[0].clientX - event.touches[1].clientX
@@ -857,9 +906,10 @@ void main() {
       const wrap = document.getElementById('glwrap')
       if (!wrap) return
       const rect = wrap.getBoundingClientRect()
-      const width = rect.width || window.innerWidth || 320
+      const runtimeWindow = this.getRuntimeWindow()
+      const width = rect.width || runtimeWindow?.innerWidth || 320
       const height = rect.height || 320
-      const dpr = window.devicePixelRatio || 1
+      const dpr = runtimeWindow?.devicePixelRatio || 1
       this.canvas.width = width * dpr
       this.canvas.height = height * dpr
       this.canvas.style.width = `${width}px`
@@ -870,7 +920,9 @@ void main() {
     requestRender() {
       if (this.renderPending) return
       this.renderPending = true
-      requestAnimationFrame(() => {
+      const runtimeWindow = this.getRuntimeWindow()
+      const raf = runtimeWindow?.requestAnimationFrame || ((cb) => setTimeout(cb, 16))
+      raf(() => {
         this.renderPending = false
         this.render()
       })
@@ -930,8 +982,8 @@ void main() {
       await this.loadNrrdFromUrl(this.modelUrl, '序列NRRD')
     },
     async pickNrrd() {
-      if (!this.isH5) {
-        uni.showToast({ title: '请在H5端选择文件', icon: 'none' })
+      if (!this.runtimeSupported) {
+        uni.showToast({ title: '当前环境不支持选文件', icon: 'none' })
         return
       }
       const choose = uni.chooseFile || uni.chooseMessageFile
@@ -957,7 +1009,7 @@ void main() {
         })
     },
     async loadNrrdFromUrl(url, label) {
-      if (!this.isH5) return
+      if (!this.runtimeSupported) return
       try {
         this.loading = true
         const targetUrl = this.normalizeUrl(url)
@@ -993,7 +1045,7 @@ void main() {
       }
     },
     async loadNrrdPair(flairUrl, labelUrl, label) {
-      if (!this.isH5) return
+      if (!this.runtimeSupported) return
       try {
         this.loading = true
         const flairTarget = this.normalizeUrl(flairUrl)
@@ -1180,35 +1232,32 @@ void main() {
     normalizeUrl(url) {
       if (!url) return ''
       if (/^https?:\/\//i.test(url) || url.startsWith('blob:')) return url
-      const base = window?.location?.origin || ''
+      const runtimeWindow = this.getRuntimeWindow()
+      const base = runtimeWindow?.location?.origin || ''
       if (!base) return url
       if (url.startsWith('/')) return `${base}${url}`
       return `${base}/${url}`
     },
     async decompress(payload) {
-      if (typeof DecompressionStream === 'undefined') {
-        throw new Error('DecompressionStream not supported')
-      }
-      const formats = ['deflate', 'gzip']
-      let lastError = null
-      for (let i = 0; i < formats.length; i += 1) {
-        try {
-          const stream = new Response(
-            new Blob([payload]).stream().pipeThrough(new DecompressionStream(formats[i]))
-          )
-          const buffer = await stream.arrayBuffer()
-          return new Uint8Array(buffer)
-        } catch (err) {
-          console.error('decompress failed', { format: formats[i], err })
-          lastError = err
+      if (typeof DecompressionStream !== 'undefined') {
+        const formats = ['deflate', 'gzip']
+        for (let i = 0; i < formats.length; i += 1) {
+          try {
+            const stream = new Response(
+              new Blob([payload]).stream().pipeThrough(new DecompressionStream(formats[i]))
+            )
+            const buffer = await stream.arrayBuffer()
+            return new Uint8Array(buffer)
+          } catch (err) {
+            // ignore and fallback to next decoder
+          }
         }
       }
       try {
         return inflateRaw(payload)
       } catch (err) {
-        console.error('inflateRaw failed', { err })
+        throw new Error(`\u89e3\u538b\u5931\u8d25: ${err?.message || err}`)
       }
-      throw lastError || new Error('解压失败')
     },
     buildPointCloud() {
       if (!this.volume || !this.glReady) return
@@ -1334,6 +1383,11 @@ void main() {
 .page {
   min-height: 100vh;
   background: #edf4ff;
+}
+
+.gl-webview {
+  width: 100%;
+  height: 100%;
 }
 
 .gl-wrap {

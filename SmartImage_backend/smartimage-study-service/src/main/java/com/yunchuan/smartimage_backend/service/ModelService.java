@@ -6,6 +6,7 @@ import com.yunchuan.smartimage_backend.entity.PatientStudy;
 import com.yunchuan.smartimage_backend.mapper.FileUploadMapper;
 import com.yunchuan.smartimage_backend.mapper.PatientStudyMapper;
 import com.yunchuan.smartimage_backend.vo.ModelVO;
+import com.yunchuan.smartimage_backend.vo.StudyArtifactsVO;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -59,6 +60,34 @@ public class ModelService {
         return vo;
     }
 
+    public StudyArtifactsVO getLatestArtifacts(Long studyId) {
+        PatientStudy study = patientStudyMapper.findById(studyId);
+        if (study == null) {
+            throw new BusinessException(404, "study not found");
+        }
+        List<FileUpload> uploads = fileUploadMapper.listByStudyId(studyId);
+        FileUpload heatmapFile = pickLatestByType(uploads, this::isCtvHeatmapFile);
+        FileUpload cpdmFile = pickLatestByType(uploads, this::isCpdmPetPngFile);
+
+        StudyArtifactsVO vo = new StudyArtifactsVO();
+        vo.setStudyId(studyId);
+        if (heatmapFile != null) {
+            StudyArtifactsVO.HeatmapArtifact heatmap = new StudyArtifactsVO.HeatmapArtifact();
+            heatmap.setFilePath(heatmapFile.getFilePath());
+            heatmap.setFileType(heatmapFile.getFileType());
+            heatmap.setUpdatedAt(formatTime(heatmapFile));
+            vo.setHeatmap(heatmap);
+        }
+        if (cpdmFile != null) {
+            StudyArtifactsVO.CpdmArtifact cpdm = new StudyArtifactsVO.CpdmArtifact();
+            cpdm.setPetPngPath(cpdmFile.getFilePath());
+            cpdm.setFileType(cpdmFile.getFileType());
+            cpdm.setUpdatedAt(formatTime(cpdmFile));
+            vo.setCpdm(cpdm);
+        }
+        return vo;
+    }
+
     public FileUpload getLatestVolumeFile(Long studyId) {
         List<FileUpload> uploads = fileUploadMapper.listByStudyId(studyId);
         return pickPreferredVolume(uploads);
@@ -67,6 +96,34 @@ public class ModelService {
     public FileUpload getLatestLabelFile(Long studyId) {
         List<FileUpload> uploads = fileUploadMapper.listByStudyId(studyId);
         return pickLatest(uploads, FileRole.LABEL);
+    }
+
+    private FileUpload pickLatestByType(List<FileUpload> uploads, java.util.function.Predicate<String> matcher) {
+        if (uploads == null || uploads.isEmpty()) {
+            return null;
+        }
+        for (FileUpload upload : uploads) {
+            String type = normalizeType(upload.getFileType());
+            if (matcher.test(type)) {
+                return upload;
+            }
+        }
+        return null;
+    }
+
+    private boolean isCtvHeatmapFile(String type) {
+        return "ctv.heatmap".equals(type) || type.startsWith("ctv.heatmap.");
+    }
+
+    private boolean isCpdmPetPngFile(String type) {
+        return "cpdm.pet.png".equals(type);
+    }
+
+    private String formatTime(FileUpload upload) {
+        if (upload == null || upload.getCreatedAt() == null) {
+            return "";
+        }
+        return upload.getCreatedAt().toString();
     }
 
     private FileUpload pickLatest(List<FileUpload> uploads, FileRole role) {
