@@ -267,28 +267,125 @@ export default {
     pickFile() {
       return new Promise((resolve) => {
         const choose = uni.chooseFile || uni.chooseMessageFile
-        if (!choose) {
-          uni.showToast({ title: '当前端暂不支持文件选择', icon: 'none' })
+        if (choose) {
+          choose({
+            count: 1,
+            type: 'all',
+            success: (res) => {
+              const file = res.tempFiles && res.tempFiles[0]
+              if (!file) {
+                resolve(null)
+                return
+              }
+              const path = this.normalizeNativeFilePath(file.path || file.tempFilePath)
+              const name = file.name || (path ? path.split('/').pop() : '')
+              const fileObj = file.file || (typeof File !== 'undefined' && file instanceof File ? file : null)
+              resolve({ ...file, path, name, fileObj })
+            },
+            fail: () => resolve(null)
+          })
+          return
+        }
+        if (typeof plus !== 'undefined' && plus.io && typeof plus.io.chooseFile === 'function') {
+          plus.io.chooseFile(
+            { count: 1, multiple: false, filetypes: ['*'], title: 'Select File' },
+            (res) => {
+              const raw = Array.isArray(res?.files) ? res.files[0] : (Array.isArray(res) ? res[0] : res)
+              if (!raw) {
+                resolve(null)
+                return
+              }
+              const path = this.normalizeNativeFilePath(raw.path || raw.filePath || raw.tempFilePath || raw.url || String(raw))
+              const name = raw.name || (path ? path.split('/').pop() : '')
+              resolve({ ...raw, path, name, fileObj: null })
+            },
+            () => resolve(null)
+          )
+          return
+        }
+        this.tryPickByAndroidIntent('*/*').then(resolve).catch(() => resolve(null))
+      })
+    },
+    tryPickByAndroidIntent(mimeType = '*/*') {
+      if (!this.isAppPlusRuntime() || String(plus.os?.name || '').toLowerCase() !== 'android') {
+        return Promise.resolve(null)
+      }
+      return new Promise((resolve, reject) => {
+        const main = plus.android.runtimeMainActivity()
+        if (!main) {
           resolve(null)
           return
         }
-        choose({
-          count: 1,
-          type: 'all',
-          success: (res) => {
-            const file = res.tempFiles && res.tempFiles[0]
-            if (!file) {
-              resolve(null)
+        const Intent = plus.android.importClass('android.content.Intent')
+        const Activity = plus.android.importClass('android.app.Activity')
+        const requestCode = Number(Date.now() % 60000) + 1000
+        const previous = main.onActivityResult
+        let settled = false
+        const finish = (err, value = null) => {
+          if (settled) return
+          settled = true
+          main.onActivityResult = previous
+          if (err) {
+            reject(err)
+            return
+          }
+          resolve(value)
+        }
+        const self = this
+        main.onActivityResult = function(request, resultCode, data) {
+          if (request !== requestCode) {
+            if (typeof previous === 'function') previous(request, resultCode, data)
+            return
+          }
+          if (resultCode !== Activity.RESULT_OK || !data) {
+            finish(null, null)
+            return
+          }
+          try {
+            const uri = data.getData && data.getData()
+            if (!uri) {
+              finish(null, null)
               return
             }
-            const path = file.path || file.tempFilePath
-            const name = file.name || (path ? path.split('/').pop() : '')
-            const fileObj = file.file || (typeof File !== 'undefined' && file instanceof File ? file : null)
-            resolve({ ...file, path, name, fileObj })
-          },
-          fail: () => resolve(null)
-        })
+            plus.android.importClass(uri)
+            const uriString = String(uri.toString ? uri.toString() : '')
+            if (!uriString) {
+              finish(null, null)
+              return
+            }
+            const meta = self.queryContentUriMeta(uriString)
+            finish(null, {
+              path: uriString,
+              tempFilePath: uriString,
+              name: meta.name || self.extractLocalFileName(uriString),
+              size: Number(meta.size || 0)
+            })
+          } catch (err) {
+            finish(err)
+          }
+        }
+        try {
+          const intent = new Intent(Intent.ACTION_GET_CONTENT)
+          intent.addCategory(Intent.CATEGORY_OPENABLE)
+          intent.setType(mimeType || '*/*')
+          intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+          const chooser = Intent.createChooser(intent, 'Select File')
+          main.startActivityForResult(chooser, requestCode)
+        } catch (err) {
+          finish(err)
+        }
       })
+    },
+    normalizeNativeFilePath(path) {
+      const raw = String(path || '').trim()
+      if (!raw) return ''
+      if (/^file:\/\//i.test(raw)) return decodeURIComponent(raw.replace(/^file:\/\//i, ''))
+      return raw
+    },
+    extractLocalFileName(path) {
+      const normalized = String(path || '').replace(/\\/g, '/')
+      const parts = normalized.split('/')
+      return decodeURIComponent(parts[parts.length - 1] || '')
     },
     async uploadGtvLabel() {
       if (this.processing) return
@@ -452,9 +549,9 @@ export default {
     async resolveLocalPath(file) {
       if (!file) return ''
       const local = file.localPath || ''
-      if (local && !/^https?:\/\//i.test(local)) return local
+      if (local && !/^https?:\/\//i.test(local)) return this.resolveUploadPath(local, file.name || '')
       const remote = file.filePath || ''
-      if (!remote || !/^https?:\/\//i.test(remote)) return remote
+      if (!remote || !/^https?:\/\//i.test(remote)) return this.resolveUploadPath(remote, file.name || '')
       return new Promise((resolve) => {
         uni.downloadFile({
           url: remote,
@@ -462,6 +559,128 @@ export default {
           fail: () => resolve('')
         })
       })
+    },
+    async resolveUploadPath(path, name = '') {
+      const raw = this.normalizeNativeFilePath(path)
+      if (!raw) return ''
+      if (!this.isAppPlusRuntime()) return raw
+      if (/^content:\/\//i.test(raw)) {
+        const copied = await this.copyContentUriToPrivateDoc(raw, name).catch((err) => {
+          console.error('copy content uri failed', err)
+          return ''
+        })
+        if (!copied) return ''
+        return this.toNativeUploadPath(copied)
+      }
+      return this.toNativeUploadPath(raw)
+    },
+    toNativeUploadPath(path) {
+      let local = this.normalizeNativeFilePath(path)
+      if (!local) return ''
+      if (this.isAppPlusRuntime() && typeof plus.io.convertLocalFileSystemURL === 'function') {
+        const lower = local.toLowerCase()
+        if (lower.startsWith('_doc/') || lower.startsWith('_documents/') || lower.startsWith('_www/')) {
+          local = plus.io.convertLocalFileSystemURL(local)
+        }
+      }
+      return local
+    },
+    isAppPlusRuntime() {
+      return typeof plus !== 'undefined' && !!plus.io
+    },
+    buildSafeCopyName(name = '') {
+      const fallback = 'upload.bin'
+      const base = String(name || fallback).trim() || fallback
+      const sanitized = base.replace(/[\/:*?"<>|]/g, '_')
+      const dot = sanitized.lastIndexOf('.')
+      const stem = dot > 0 ? sanitized.slice(0, dot) : sanitized
+      const ext = dot > 0 ? sanitized.slice(dot) : '.bin'
+      return stem + '_' + Date.now() + ext
+    },
+    copyContentUriToPrivateDoc(contentUri, sourceName = '') {
+      if (!this.isAppPlusRuntime()) return Promise.resolve('')
+      if (String(plus.os?.name || '').toLowerCase() !== 'android') return Promise.resolve('')
+      return new Promise((resolve, reject) => {
+        plus.io.requestFileSystem(
+          plus.io.PRIVATE_DOC,
+          (fs) => {
+            fs.root.getDirectory(
+              'ctv-upload',
+              { create: true },
+              () => {
+                try {
+                  const targetName = this.buildSafeCopyName(sourceName || 'upload.bin')
+                  const relativePath = '_doc/ctv-upload/' + targetName
+                  const absolutePath = plus.io.convertLocalFileSystemURL(relativePath)
+                  this.streamContentUriToFile(contentUri, absolutePath)
+                  resolve(relativePath)
+                } catch (err) {
+                  reject(err)
+                }
+              },
+              (err) => reject(err),
+            )
+          },
+          (err) => reject(err),
+        )
+      })
+    },
+    queryContentUriMeta(contentUri) {
+      if (!this.isAppPlusRuntime()) return { name: '', size: 0 }
+      try {
+        const activity = plus.android.runtimeMainActivity()
+        const Uri = plus.android.importClass('android.net.Uri')
+        const OpenableColumns = plus.android.importClass('android.provider.OpenableColumns')
+        const resolver = activity.getContentResolver()
+        const uri = Uri.parse(contentUri)
+        const cursor = resolver.query(uri, null, null, null, null)
+        if (!cursor) return { name: '', size: 0 }
+        let name = ''
+        let size = 0
+        try {
+          if (cursor.moveToFirst()) {
+            const nameIdx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            const sizeIdx = cursor.getColumnIndex(OpenableColumns.SIZE)
+            if (nameIdx >= 0) name = String(cursor.getString(nameIdx) || '')
+            if (sizeIdx >= 0) size = Number(cursor.getLong(sizeIdx) || 0)
+          }
+        } finally {
+          cursor.close()
+        }
+        return { name, size }
+      } catch (err) {
+        console.error('query content uri meta failed', err)
+        return { name: '', size: 0 }
+      }
+    },
+    streamContentUriToFile(contentUri, absolutePath) {
+      if (!this.isAppPlusRuntime()) return
+      const activity = plus.android.runtimeMainActivity()
+      const Uri = plus.android.importClass('android.net.Uri')
+      const resolver = activity.getContentResolver()
+      const uri = Uri.parse(contentUri)
+      const inputStream = resolver.openInputStream(uri)
+      if (!inputStream) throw new Error('open input stream failed')
+      const outputStream = plus.android.newObject('java.io.FileOutputStream', absolutePath)
+      try {
+        let value = inputStream.read()
+        while (value !== -1) {
+          outputStream.write(value)
+          value = inputStream.read()
+        }
+        outputStream.flush()
+      } finally {
+        this.closeJavaStream(outputStream)
+        this.closeJavaStream(inputStream)
+      }
+    },
+    closeJavaStream(stream) {
+      if (!stream || typeof stream.close !== 'function') return
+      try {
+        stream.close()
+      } catch (err) {
+        console.error('close java stream failed', err)
+      }
     },
     buildStorageFormData() {
       const formData = {}

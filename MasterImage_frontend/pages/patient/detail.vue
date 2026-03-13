@@ -654,32 +654,521 @@ export default {
       if (!this.patientId) return
       uni.navigateTo({ url: `/pages/patient/edit?id=${this.patientId}` })
     },
-    pickFile() {
-      return new Promise((resolve) => {
-        const choose = uni.chooseFile || uni.chooseMessageFile
-        if (!choose) {
+    async pickFile() {
+      try {
+        let picked = await this.tryPickByUniApi('chooseFile', { type: 'all' })
+        if (!picked) picked = await this.tryPickByUniApi('chooseMessageFile', { type: 'file' })
+        if (!picked) picked = await this.tryPickByPlusFile()
+        if (!picked) picked = await this.tryPickByAndroidIntent('*/*')
+        if (!picked) {
           uni.showToast({ title: '\u5f53\u524d\u7aef\u6682\u4e0d\u652f\u6301\u6587\u4ef6\u9009\u62e9', icon: 'none' })
-          resolve(null)
-          return
+          return null
         }
+        const path = this.normalizeNativeFilePath(this.extractPickedPath(picked))
+        const name = picked.name || this.extractLocalFileName(path) || ''
+        const fileObj = picked.file || (typeof File !== 'undefined' && picked instanceof File ? picked : null)
+        let normalized = {
+          ...picked,
+          path,
+          filePath: path,
+          name,
+          fileObj,
+          size: Number(picked.size || 0)
+        }
+        normalized = await this.preparePickedFileForUpload(normalized)
+        const finalizedPath = this.normalizeNativeFilePath(this.extractPickedPath(normalized))
+        normalized = { ...normalized, path: finalizedPath, filePath: finalizedPath }
+        if (!finalizedPath) {
+          uni.showToast({ title: '\u6587\u4ef6\u8bfb\u53d6\u5931\u8d25\uff0c\u8bf7\u91cd\u65b0\u9009\u62e9', icon: 'none' })
+          return null
+        }
+        return normalized
+      } catch (err) {
+        console.error('pick file failed', err)
+        uni.showToast({ title: '\u9009\u62e9\u6587\u4ef6\u5931\u8d25', icon: 'none' })
+        return null
+      }
+    },
+    tryPickByUniApi(apiName, extraOptions = {}) {
+      const choose = uni?.[apiName]
+      if (typeof choose !== 'function') return Promise.resolve(null)
+      return new Promise((resolve, reject) => {
         choose({
           count: 1,
-          type: 'all',
+          ...extraOptions,
           success: (res) => {
-            const file = res.tempFiles && res.tempFiles[0]
-            if (!file) {
+            const first = (res.tempFiles || [])[0]
+            if (first) {
+              resolve(first)
+              return
+            }
+            const fallbackPath = Array.isArray(res.tempFilePaths) ? (res.tempFilePaths[0] || '') : ''
+            if (fallbackPath) {
+              resolve({
+                path: fallbackPath,
+                tempFilePath: fallbackPath,
+                name: this.extractLocalFileName(fallbackPath)
+              })
+              return
+            }
+            resolve(null)
+          },
+          fail: (err) => {
+            if (this.isChooseCancelled(err)) {
               resolve(null)
               return
             }
-            const path = file.path || file.tempFilePath
-            const name = file.name || (path ? path.split('/').pop() : '')
-            const fileObj =
-              file.file || (typeof File !== 'undefined' && file instanceof File ? file : null)
-            resolve({ ...file, path, name, fileObj })
-          },
-          fail: () => resolve(null)
+            reject(err)
+          }
         })
       })
+    },
+    tryPickByPlusFile() {
+      if (typeof plus === 'undefined' || !plus.io || typeof plus.io.chooseFile !== 'function') {
+        return Promise.resolve(null)
+      }
+      return new Promise((resolve, reject) => {
+        let settled = false
+        const finish = (err, value = null) => {
+          if (settled) return
+          settled = true
+          if (err) {
+            if (this.isChooseCancelled(err)) {
+              resolve(null)
+              return
+            }
+            reject(err)
+            return
+          }
+          resolve(value)
+        }
+        const consume = (result) => finish(null, this.pickFirstChosenFile(result))
+        try {
+          const maybe = plus.io.chooseFile(
+            {
+              count: 1,
+              multiple: false,
+              filetypes: ['*'],
+              title: 'Select File'
+            },
+            (res) => consume(res),
+            (err) => finish(err)
+          )
+          if (maybe && typeof maybe.then === 'function') {
+            maybe.then((res) => consume(res)).catch((err) => finish(err))
+            return
+          }
+          if (this.looksLikePlusChooseResult(maybe)) {
+            consume(maybe)
+          }
+        } catch (err) {
+          finish(err)
+        }
+      })
+    },
+    tryPickByAndroidIntent(mimeType = '*/*') {
+      if (!this.isAppPlusRuntime() || String(plus.os?.name || '').toLowerCase() !== 'android') {
+        return Promise.resolve(null)
+      }
+      return new Promise((resolve, reject) => {
+        const main = plus.android.runtimeMainActivity()
+        if (!main) {
+          resolve(null)
+          return
+        }
+        const Intent = plus.android.importClass('android.content.Intent')
+        const Activity = plus.android.importClass('android.app.Activity')
+        const requestCode = Number(Date.now() % 60000) + 1000
+        const previous = main.onActivityResult
+        let settled = false
+        const finish = (err, value = null) => {
+          if (settled) return
+          settled = true
+          main.onActivityResult = previous
+          if (err) {
+            if (this.isChooseCancelled(err)) {
+              resolve(null)
+              return
+            }
+            reject(err)
+            return
+          }
+          resolve(value)
+        }
+        const self = this
+        main.onActivityResult = function(request, resultCode, data) {
+          if (request !== requestCode) {
+            if (typeof previous === 'function') previous(request, resultCode, data)
+            return
+          }
+          if (resultCode !== Activity.RESULT_OK || !data) {
+            finish(null, null)
+            return
+          }
+          try {
+            const uri = data.getData && data.getData()
+            if (!uri) {
+              finish(null, null)
+              return
+            }
+            plus.android.importClass(uri)
+            const uriString = String(uri.toString ? uri.toString() : '')
+            if (!uriString) {
+              finish(null, null)
+              return
+            }
+            const meta = self.queryContentUriMeta(uriString)
+            finish(null, {
+              path: uriString,
+              tempFilePath: uriString,
+              name: meta.name || self.extractLocalFileName(uriString),
+              size: Number(meta.size || 0)
+            })
+          } catch (err) {
+            finish(err)
+          }
+        }
+        try {
+          const intent = new Intent(Intent.ACTION_GET_CONTENT)
+          intent.addCategory(Intent.CATEGORY_OPENABLE)
+          intent.setType(mimeType || '*/*')
+          intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+          const chooser = Intent.createChooser(intent, 'Select File')
+          main.startActivityForResult(chooser, requestCode)
+        } catch (err) {
+          finish(err)
+        }
+      })
+    },
+    looksLikePlusChooseResult(result) {
+      if (!result) return false
+      if (typeof result === 'string') return true
+      if (Array.isArray(result) && result.length) return true
+      if (Array.isArray(result.files) && result.files.length) return true
+      return !!(result.path || result.filePath || result.tempFilePath || result.file || result.url)
+    },
+    pickFirstChosenFile(result) {
+      if (!result) return null
+      if (typeof result === 'string') return { path: result }
+      if (Array.isArray(result)) return result[0] || null
+      if (Array.isArray(result.files)) return result.files[0] || null
+      if (result.file) return result.file
+      return result
+    },
+    extractPickedPath(file, depth = 0) {
+      if (!file || depth > 4) return ''
+      if (typeof file === 'string') return String(file).trim()
+
+      const direct = [
+        file.path,
+        file.tempFilePath,
+        file.filePath,
+        file.uri,
+        file.localPath,
+        file.savedFilePath,
+        file.apFilePath,
+        file.url,
+        file.fullPath,
+        file.realPath,
+        file.src
+      ].find((v) => typeof v === 'string' && v.trim())
+      if (direct) return direct
+
+      const listFields = [file.tempFilePaths, file.tempFiles, file.files, file.items, file.results]
+      for (const list of listFields) {
+        if (!Array.isArray(list) || !list.length) continue
+        const nested = this.extractPickedPath(list[0], depth + 1)
+        if (nested) return nested
+      }
+
+      const nestedFields = [file.file, file.result, file.data, file.target]
+      for (const nestedObj of nestedFields) {
+        if (!nestedObj || typeof nestedObj !== 'object') continue
+        const nested = this.extractPickedPath(nestedObj, depth + 1)
+        if (nested) return nested
+      }
+
+      const keys = Object.keys(file || {})
+      for (const key of keys) {
+        const value = file[key]
+        if (typeof value === 'string' && this.looksLikePathString(value)) {
+          return value.trim()
+        }
+      }
+      return ''
+    },
+    looksLikePathString(value) {
+      const raw = String(value || '').trim()
+      if (!raw) return false
+      return /^(content|file|http|https|unifile):\/\//i.test(raw) ||
+        raw.startsWith('/') ||
+        raw.startsWith('_doc/') ||
+        raw.startsWith('_www/') ||
+        raw.startsWith('_downloads/') ||
+        /[\\/]/.test(raw)
+    },
+    normalizeNativeFilePath(path) {
+      const raw = String(path || '').trim()
+      if (!raw) return ''
+      if (/^file:\/\//i.test(raw)) {
+        const pure = raw.replace(/^file:\/\//i, '')
+        try {
+          return decodeURIComponent(pure)
+        } catch (err) {
+          return pure
+        }
+      }
+      return raw
+    },
+    isAppPrivatePath(path) {
+      const value = String(path || '').toLowerCase()
+      return value.startsWith('_doc/') || value.startsWith('_documents/') || value.startsWith('_www/')
+    },
+    toResolvableLocalUrl(path) {
+      const value = String(path || '').trim()
+      if (!value) return ''
+      if (/^(file|content):\/\//i.test(value)) return value
+      if (value.startsWith('/')) return `file://${value}`
+      return value
+    },
+    async preparePickedFileForUpload(file) {
+      if (!file) return null
+      const rawPath = this.normalizeNativeFilePath(this.extractPickedPath(file))
+      if (!rawPath) return { ...file, path: '' }
+      let next = { ...file, path: rawPath, filePath: rawPath }
+      if (!this.isAppPlusRuntime()) return next
+      if (/^content:\/\//i.test(rawPath)) {
+        const copied = await this.copyContentUriToPrivateDoc(rawPath, next.name || '').catch((err) => {
+          console.error('copy content uri for picked file failed', err)
+          return ''
+        })
+        if (copied) {
+          next = { ...next, path: copied, filePath: copied }
+        }
+      } else if (!this.isAppPrivatePath(rawPath) && !/^https?:\/\//i.test(rawPath)) {
+        const copied = await this.copyFileToPrivateDoc(rawPath, next.name || '').catch((err) => {
+          console.error('copy local file for upload failed', err)
+          return ''
+        })
+        if (copied) {
+          next = { ...next, path: copied, filePath: copied }
+        }
+      }
+      if (!(Number(next.size || 0) > 0)) {
+        const meta = await this.readLocalFileMeta(next.path)
+        if (meta?.size > 0 || meta?.name) {
+          next = {
+            ...next,
+            name: next.name || meta.name || '',
+            size: Number(meta.size || next.size || 0)
+          }
+        }
+      }
+      return next
+    },
+    copyFileToPrivateDoc(sourcePath, sourceName = '') {
+      if (!this.isAppPlusRuntime()) return Promise.resolve('')
+      const targetPath = this.toResolvableLocalUrl(sourcePath)
+      if (!targetPath) return Promise.resolve('')
+      return new Promise((resolve, reject) => {
+        plus.io.resolveLocalFileSystemURL(
+          targetPath,
+          (entry) => {
+            plus.io.requestFileSystem(
+              plus.io.PRIVATE_DOC,
+              (fs) => {
+                fs.root.getDirectory(
+                  'study-upload',
+                  { create: true },
+                  (dirEntry) => {
+                    const targetName = this.buildSafeCopyName(sourceName || entry.name || 'upload.bin')
+                    entry.copyTo(
+                      dirEntry,
+                      targetName,
+                      (copiedEntry) => {
+                        const copiedPath = copiedEntry?.toLocalURL?.() || copiedEntry?.fullPath || ''
+                        resolve(copiedPath)
+                      },
+                      (err) => reject(err)
+                    )
+                  },
+                  (err) => reject(err)
+                )
+              },
+              (err) => reject(err)
+            )
+          },
+          (err) => reject(err)
+        )
+      })
+    },
+    readLocalFileMeta(path) {
+      if (!path || !this.isAppPlusRuntime() || typeof plus.io.resolveLocalFileSystemURL !== 'function') {
+        return Promise.resolve({ name: this.extractLocalFileName(path), size: 0 })
+      }
+      return new Promise((resolve) => {
+        plus.io.resolveLocalFileSystemURL(
+          this.toResolvableLocalUrl(path),
+          (entry) => {
+            if (!entry || typeof entry.file !== 'function') {
+              resolve({ name: this.extractLocalFileName(path), size: 0 })
+              return
+            }
+            entry.file(
+              (file) => resolve({
+                name: file?.name || this.extractLocalFileName(path),
+                size: Number(file?.size || 0)
+              }),
+              () => resolve({ name: this.extractLocalFileName(path), size: 0 })
+            )
+          },
+          () => resolve({ name: this.extractLocalFileName(path), size: 0 })
+        )
+      })
+    },
+    extractLocalFileName(path) {
+      const normalized = String(path || '').replace(/\\/g, '/')
+      const parts = normalized.split('/')
+      try {
+        return decodeURIComponent(parts[parts.length - 1] || '')
+      } catch (err) {
+        return parts[parts.length - 1] || ''
+      }
+    },
+    isChooseCancelled(err) {
+      const msg = String(err?.errMsg || err?.message || err || '').toLowerCase()
+      return msg.includes('cancel') || msg.includes('\u53d6\u6d88')
+    },
+    toNativeUploadPath(path) {
+      let local = this.normalizeNativeFilePath(path)
+      if (!local) return ''
+      if (typeof plus !== 'undefined' && plus.io && typeof plus.io.convertLocalFileSystemURL === 'function') {
+        const lower = local.toLowerCase()
+        if (lower.startsWith('_doc/') || lower.startsWith('_documents/') || lower.startsWith('_www/')) {
+          local = plus.io.convertLocalFileSystemURL(local)
+        }
+      }
+      return local
+    },
+    isAppPlusRuntime() {
+      return typeof plus !== 'undefined' && !!plus.io
+    },
+    buildSafeCopyName(name = '') {
+      const fallback = 'upload.bin'
+      const base = String(name || fallback).trim() || fallback
+      const sanitized = base.replace(/[\\/:*?"<>|]/g, '_')
+      const dot = sanitized.lastIndexOf('.')
+      const stem = dot > 0 ? sanitized.slice(0, dot) : sanitized
+      const ext = dot > 0 ? sanitized.slice(dot) : '.bin'
+      return `${stem}_${Date.now()}${ext}`
+    },
+    async resolveUploadPath(file) {
+      const raw = this.normalizeNativeFilePath(this.extractPickedPath(file))
+      if (!raw) return ''
+      if (!this.isAppPlusRuntime()) return this.toNativeUploadPath(raw)
+      if (/^content:\/\//i.test(raw)) {
+        const copied = await this.copyContentUriToPrivateDoc(raw, file?.name || '').catch((err) => {
+          console.error('copy content uri for upload failed', err)
+          return ''
+        })
+        if (!copied) return ''
+        return this.toNativeUploadPath(copied)
+      }
+      if (!this.isAppPrivatePath(raw) && !/^https?:\/\//i.test(raw)) {
+        const copied = await this.copyFileToPrivateDoc(raw, file?.name || '').catch((err) => {
+          console.error('copy local file for upload path failed', err)
+          return ''
+        })
+        if (copied) return this.toNativeUploadPath(copied)
+      }
+      return this.toNativeUploadPath(raw)
+    },
+    copyContentUriToPrivateDoc(contentUri, sourceName = '') {
+      if (!this.isAppPlusRuntime()) return Promise.resolve('')
+      if (String(plus.os?.name || '').toLowerCase() !== 'android') {
+        return Promise.resolve('')
+      }
+      return new Promise((resolve, reject) => {
+        plus.io.requestFileSystem(
+          plus.io.PRIVATE_DOC,
+          (fs) => {
+            fs.root.getDirectory(
+              'study-upload',
+              { create: true },
+              () => {
+                try {
+                  const targetName = this.buildSafeCopyName(sourceName || 'upload.bin')
+                  const relativePath = `_doc/study-upload/${targetName}`
+                  const absolutePath = plus.io.convertLocalFileSystemURL(relativePath)
+                  this.streamContentUriToFile(contentUri, absolutePath)
+                  resolve(relativePath)
+                } catch (err) {
+                  reject(err)
+                }
+              },
+              (err) => reject(err)
+            )
+          },
+          (err) => reject(err)
+        )
+      })
+    },
+    queryContentUriMeta(contentUri) {
+      if (!this.isAppPlusRuntime()) return { name: '', size: 0 }
+      try {
+        const activity = plus.android.runtimeMainActivity()
+        const Uri = plus.android.importClass('android.net.Uri')
+        const OpenableColumns = plus.android.importClass('android.provider.OpenableColumns')
+        const resolver = activity.getContentResolver()
+        const uri = Uri.parse(contentUri)
+        const cursor = resolver.query(uri, null, null, null, null)
+        if (!cursor) return { name: '', size: 0 }
+        let name = ''
+        let size = 0
+        try {
+          if (cursor.moveToFirst()) {
+            const nameIdx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            const sizeIdx = cursor.getColumnIndex(OpenableColumns.SIZE)
+            if (nameIdx >= 0) name = String(cursor.getString(nameIdx) || '')
+            if (sizeIdx >= 0) size = Number(cursor.getLong(sizeIdx) || 0)
+          }
+        } finally {
+          cursor.close()
+        }
+        return { name, size }
+      } catch (err) {
+        console.error('query content uri meta failed', err)
+        return { name: '', size: 0 }
+      }
+    },
+    streamContentUriToFile(contentUri, absolutePath) {
+      if (!this.isAppPlusRuntime()) return
+      const activity = plus.android.runtimeMainActivity()
+      const Uri = plus.android.importClass('android.net.Uri')
+      const resolver = activity.getContentResolver()
+      const uri = Uri.parse(contentUri)
+      const inputStream = resolver.openInputStream(uri)
+      if (!inputStream) throw new Error('open input stream failed')
+      const outputStream = plus.android.newObject('java.io.FileOutputStream', absolutePath)
+      try {
+        let value = inputStream.read()
+        while (value !== -1) {
+          outputStream.write(value)
+          value = inputStream.read()
+        }
+        outputStream.flush()
+      } finally {
+        this.closeJavaStream(outputStream)
+        this.closeJavaStream(inputStream)
+      }
+    },
+    closeJavaStream(stream) {
+      if (!stream || typeof stream.close !== 'function') return
+      try {
+        stream.close()
+      } catch (err) {
+        console.error('close java stream failed', err)
+      }
     },
 
     async createStudyForUpload(file) {
@@ -714,13 +1203,18 @@ export default {
       if (!ext) return role
       return `${role}.${ext}`
     },
-    uploadToBackend(studyId, file, role) {
+    async uploadToBackend(studyId, file, role) {
       const token = uni.getStorageSync('token') || ''
       const fileType = this.buildFileType(role, file?.name)
+      const uploadPath = await this.resolveUploadPath(file)
+      if (!uploadPath) {
+        uni.showToast({ title: '\u6587\u4ef6\u8def\u5f84\u65e0\u6548', icon: 'none' })
+        return Promise.reject(new Error('invalid upload path'))
+      }
       return new Promise((resolve, reject) => {
         uni.uploadFile({
           url: resolveApiUrl(`/api/patients/${this.patientId}/studies/${studyId}/upload`),
-          filePath: file.path,
+          filePath: uploadPath,
           name: 'file',
           formData: { fileType },
           header: token ? { Authorization: `Bearer ${token}` } : {},
@@ -1110,8 +1604,3 @@ button::after {
   border: none;
 }
 </style>
-
-
-
-
-

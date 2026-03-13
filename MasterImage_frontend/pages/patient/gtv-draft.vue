@@ -103,6 +103,7 @@
 <script>
 import { getStudiesByPatient, getModel, upsertContour } from '../../common/api'
 import { resolveApiUrl, resolveStudyResourceUrl } from '../../common/request'
+import { downloadWithMobileSupport } from '../../common/mobile-download'
 
 export default {
   data() {
@@ -276,44 +277,15 @@ export default {
     async triggerDownload(url) {
       if (!url) return
       const resolvedUrl = resolveStudyResourceUrl(url)
-      uni.showLoading({ title: '下载中...', mask: true })
-      return new Promise((resolve) => {
-        uni.downloadFile({
-          url: resolvedUrl,
-          success: (res) => {
-            if (res.statusCode !== 200) {
-              uni.showToast({ title: '下载失败', icon: 'none' })
-              uni.hideLoading()
-              resolve(null)
-              return
-            }
-            if (typeof uni.saveFile === 'function') {
-              uni.saveFile({
-                tempFilePath: res.tempFilePath,
-                success: (saveRes) => {
-                  uni.hideLoading()
-                  uni.showToast({ title: '已保存', icon: 'success' })
-                  resolve(saveRes.savedFilePath)
-                },
-                fail: () => {
-                  uni.hideLoading()
-                  uni.showToast({ title: '已下载', icon: 'success' })
-                  resolve(res.tempFilePath)
-                }
-              })
-              return
-            }
-            uni.hideLoading()
-            uni.showToast({ title: '已下载', icon: 'success' })
-            resolve(res.tempFilePath)
-          },
-          fail: () => {
-            uni.hideLoading()
-            uni.showToast({ title: '下载失败', icon: 'none' })
-            resolve(null)
-          }
-        })
+      const result = await downloadWithMobileSupport({
+        url: resolvedUrl,
+        filename: 'segmentation_result.nrrd',
+        loadingTitle: '下载中...',
+        successTitle: '已下载',
+        failTitle: '下载失败',
+        autoOpen: false
       })
+      return result?.path || ''
     },
     async runFlairSegmentation() {
       if (this.processing || !this.activeStudyId) return

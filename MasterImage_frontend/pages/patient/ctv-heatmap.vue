@@ -112,6 +112,7 @@
 <script>
 import { getStudiesByPatient, getStudyArtifactsLatest } from '../../common/api'
 import { resolveModelUrl, getToken } from '../../common/request'
+import { downloadWithMobileSupport } from '../../common/mobile-download'
 
 export default {
   data() {
@@ -464,21 +465,13 @@ export default {
     downloadHeatmap() {
       const url = this.heatmapUrl
       if (!url) return
-      if (this.isH5 && typeof window !== 'undefined') {
-        window.open(url)
-        return
-      }
-      uni.showLoading({ title: '处理中...', mask: true })
-      uni.downloadFile({
+      downloadWithMobileSupport({
         url,
-        success: () => {
-          uni.hideLoading()
-          uni.showToast({ title: '完成', icon: 'success' })
-        },
-        fail: () => {
-          uni.hideLoading()
-          uni.showToast({ title: '操作失败', icon: 'none' })
-        }
+        filename: 'ctv_heatmap.png',
+        loadingTitle: '下载中...',
+        successTitle: '已下载',
+        failTitle: '下载失败',
+        autoOpen: false
       })
     },
     async uploadMultimodalForHeatmap(files) {
@@ -679,21 +672,13 @@ export default {
     async openCpdmPng() {
       const url = this.cpdmPngUrl
       if (!url) return
-      if (this.isH5 && typeof window !== 'undefined') {
-        window.open(url)
-        return
-      }
-      uni.showLoading({ title: '涓嬭浇涓?..', mask: true })
-      uni.downloadFile({
+      await downloadWithMobileSupport({
         url,
-        success: () => {
-          uni.hideLoading()
-          uni.showToast({ title: '涓嬭浇鎴愬姛', icon: 'success' })
-        },
-        fail: () => {
-          uni.hideLoading()
-          uni.showToast({ title: '涓嬭浇澶辫触', icon: 'none' })
-        }
+        filename: 'cpdm_result.png',
+        loadingTitle: '下载中...',
+        successTitle: '已下载',
+        failTitle: '下载失败',
+        autoOpen: false
       })
     },
     async uploadMultimodalFile(endpoint, files) {

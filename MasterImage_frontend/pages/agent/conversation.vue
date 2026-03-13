@@ -48,7 +48,15 @@
       </view>
     </view>
 
-    <scroll-view class="message-list" scroll-y :scroll-with-animation="true" :scroll-into-view="scrollTarget">
+    <scroll-view
+      class="message-list"
+      scroll-y
+      :scroll-with-animation="true"
+      :scroll-into-view="scrollTarget"
+      :style="messageListInlineStyle"
+      @scroll="handleMessageScroll"
+      @scrolltolower="handleScrollToLower"
+    >
       <view
         v-for="message in messages"
         :key="message.id"
@@ -60,6 +68,8 @@
         <image v-else class="avatar" :src="agentAvatar" mode="aspectFill" />
 
         <view class="bubble-wrap">
+          <text v-if="showSenderName(message)" class="sender-name">{{ message.senderName }}</text>
+
           <view class="bubble" :class="message.self ? 'user' : 'other'">
             <view v-if="message.type === 'typing'" class="typing">
               <view class="typing-dot"></view>
@@ -68,8 +78,6 @@
             </view>
 
             <template v-else>
-              <text v-if="message.senderName && !message.self && isConsultation" class="sender-name">{{ message.senderName }}</text>
-
               <image
                 v-if="message.type === 'IMAGE' && message.ossPath"
                 class="message-image"
@@ -86,7 +94,80 @@
                 </view>
               </view>
 
-              <text v-if="message.content" class="msg-text" space="preserve">{{ message.content }}</text>
+              <view v-if="message.content" class="md-content">
+                <view
+                  v-for="(block, blockIndex) in getMarkdownBlocks(message.content)"
+                  :key="`${message.id}-block-${blockIndex}`"
+                  class="md-block"
+                  :class="`md-block--${block.type}`"
+                >
+                  <text v-if="block.type === 'heading'" class="md-heading" :class="`md-heading--${block.level}`" selectable space="preserve">
+                    <text
+                      v-for="(segment, segmentIndex) in getInlineSegments(block.text)"
+                      :key="`${message.id}-h-${blockIndex}-${segmentIndex}`"
+                      class="md-inline"
+                      :class="inlineClass(segment)"
+                      selectable
+                      @click.stop="handleInlineClick(segment)"
+                    >
+                      {{ segment.text }}
+                    </text>
+                  </text>
+
+                  <view v-else-if="block.type === 'list'" class="md-list">
+                    <view v-for="(item, itemIndex) in block.items" :key="`${message.id}-l-${blockIndex}-${itemIndex}`" class="md-list-item">
+                      <text class="md-list-marker" selectable>{{ block.ordered ? `${itemIndex + 1}.` : '•' }}</text>
+                      <text class="md-list-text" selectable space="preserve">
+                        <text
+                          v-for="(segment, segmentIndex) in getInlineSegments(item)"
+                          :key="`${message.id}-li-${blockIndex}-${itemIndex}-${segmentIndex}`"
+                          class="md-inline"
+                          :class="inlineClass(segment)"
+                          selectable
+                          @click.stop="handleInlineClick(segment)"
+                        >
+                          {{ segment.text }}
+                        </text>
+                      </text>
+                    </view>
+                  </view>
+
+                  <view v-else-if="block.type === 'code'" class="md-code">
+                    <text v-if="block.lang" class="md-code-lang" selectable>{{ block.lang }}</text>
+                    <text class="md-code-text" selectable space="preserve">{{ block.text }}</text>
+                  </view>
+
+                  <view v-else-if="block.type === 'quote'" class="md-quote">
+                    <text class="md-quote-text" selectable space="preserve">
+                      <text
+                        v-for="(segment, segmentIndex) in getInlineSegments(block.text)"
+                        :key="`${message.id}-q-${blockIndex}-${segmentIndex}`"
+                        class="md-inline"
+                        :class="inlineClass(segment)"
+                        selectable
+                        @click.stop="handleInlineClick(segment)"
+                      >
+                        {{ segment.text }}
+                      </text>
+                    </text>
+                  </view>
+
+                  <view v-else-if="block.type === 'hr'" class="md-hr"></view>
+
+                  <text v-else class="md-paragraph" selectable space="preserve">
+                    <text
+                      v-for="(segment, segmentIndex) in getInlineSegments(block.text)"
+                      :key="`${message.id}-p-${blockIndex}-${segmentIndex}`"
+                      class="md-inline"
+                      :class="inlineClass(segment)"
+                      selectable
+                      @click.stop="handleInlineClick(segment)"
+                    >
+                      {{ segment.text }}
+                    </text>
+                  </text>
+                </view>
+              </view>
             </template>
           </view>
 
@@ -95,38 +176,43 @@
       </view>
     </scroll-view>
 
-    <view v-if="pendingAttachment" class="input-preview">
-      <view class="preview-main">
-        <wd-icon name="folder" size="18" color="#2f78d8" />
-        <view class="preview-meta">
-          <text class="preview-label">待发送附件</text>
-          <text class="preview-name">{{ pendingAttachment.name || pendingAttachment.path }}</text>
+    <view class="composer-wrap" :style="composerInlineStyle">
+      <view v-if="pendingAttachment" class="input-preview">
+        <view class="preview-main">
+          <wd-icon name="folder" size="18" color="#2f78d8" />
+          <view class="preview-meta">
+            <text class="preview-label">待发送附件</text>
+            <text class="preview-name">{{ pendingAttachment.name || pendingAttachment.path }}</text>
+          </view>
         </view>
+        <wd-icon name="close" class="preview-remove" @click="clearAttachment" />
       </view>
-      <wd-icon name="close" class="preview-remove" @click="clearAttachment" />
-    </view>
 
-    <view class="input-bar">
-      <view class="image-picker" @click="chooseAttachment">
-        <wd-icon name="add" />
+      <view class="input-bar">
+        <view class="image-picker" @click="chooseAttachment">
+          <wd-icon name="add" />
+        </view>
+        <wd-input
+          v-model="input"
+          placeholder="输入消息"
+          confirm-type="send"
+          :adjust-position="false"
+          :cursor-spacing="0"
+          :disabled="loading"
+          @keyboardheightchange="handleInputKeyboardHeightChange"
+          @confirm="handleConfirm"
+        />
+        <wd-button
+          size="small"
+          type="primary"
+          class="send-btn"
+          :loading="loading"
+          :disabled="loading || (!input.trim() && !pendingAttachment)"
+          @click="send"
+        >
+          发送
+        </wd-button>
       </view>
-      <wd-input
-        v-model="input"
-        placeholder="输入消息"
-        confirm-type="send"
-        :disabled="loading"
-        @confirm="handleConfirm"
-      />
-      <wd-button
-        size="small"
-        type="primary"
-        class="send-btn"
-        :loading="loading"
-        :disabled="loading || (!input.trim() && !pendingAttachment)"
-        @click="send"
-      >
-        发送
-      </wd-button>
     </view>
   </view>
 </template>
@@ -146,6 +232,11 @@ import {
 } from '../../common/api'
 import { resolveModelUrl, getToken } from '../../common/request'
 
+const CONSULTATION_POLL_INTERVAL = 2000
+const CONSULTATION_POLL_LIMIT = 30
+const NEAR_BOTTOM_THRESHOLD = 120
+const POLL_ERROR_TOAST_GAP = 12000
+
 export default {
   data() {
     return {
@@ -162,7 +253,22 @@ export default {
       currentUserId: null,
       members: [],
       friends: [],
-      showMemberPanel: false
+      showMemberPanel: false,
+      pollTimer: null,
+      pollingBusy: false,
+      lastRemoteMessageId: 0,
+      isNearBottom: true,
+      listViewportHeight: 0,
+      keyboardHeight: 0,
+      baseWindowHeight: 0,
+      currentWindowHeight: 0,
+      keyboardListenerBound: false,
+      keyboardHeightHandler: null,
+      windowResizeBound: false,
+      windowResizeHandler: null,
+      pollErrorToastAt: 0,
+      markdownBlockCache: new Map(),
+      markdownInlineCache: new Map()
     }
   },
   computed: {
@@ -186,6 +292,20 @@ export default {
       const name = String(this.userName || '').trim()
       if (!name) return '医'
       return name.slice(0, 1)
+    },
+    keyboardOffset() {
+      if (this.keyboardHeight <= 0) return 0
+      const shrink = Math.max(0, this.baseWindowHeight - this.currentWindowHeight)
+      const offset = this.keyboardHeight - shrink
+      return offset > 0 ? offset : 0
+    },
+    messageListInlineStyle() {
+      if (this.keyboardOffset <= 0) return null
+      return { paddingBottom: `${this.keyboardOffset + 16}px` }
+    },
+    composerInlineStyle() {
+      if (this.keyboardOffset <= 0) return null
+      return { transform: `translateY(-${this.keyboardOffset}px)` }
     }
   },
   async onLoad(options) {
@@ -208,6 +328,27 @@ export default {
       createdAt: ''
     })
     await this.loadAiHistory()
+  },
+  onShow() {
+    this.refreshWindowHeight(true)
+    this.bindWindowResize()
+    this.measureMessageListViewport()
+    this.bindKeyboardHeightChange()
+    if (!this.isConsultation || !this.consultationId) return
+    this.startConsultationPolling()
+    this.pollConsultationMessages({ silent: true, forceScroll: false })
+  },
+  onHide() {
+    this.stopConsultationPolling()
+    this.unbindKeyboardHeightChange()
+    this.unbindWindowResize()
+    this.keyboardHeight = 0
+  },
+  onUnload() {
+    this.stopConsultationPolling()
+    this.unbindKeyboardHeightChange()
+    this.unbindWindowResize()
+    this.keyboardHeight = 0
   },
   methods: {
     loadUserProfile() {
@@ -264,10 +405,14 @@ export default {
           listFriends()
         ])
         const list = Array.isArray(messages) ? messages.slice().reverse() : []
-        this.messages = list.map((item) => this.mapConsultationMessage(item))
+        const mapped = list.map((item) => this.mapConsultationMessage(item))
+        this.messages = mapped
         this.members = Array.isArray(members) ? members : []
         this.friends = Array.isArray(friends) ? friends : []
+        this.trackLatestRemoteMessage(mapped)
+        this.isNearBottom = true
         this.scrollToBottom()
+        this.measureMessageListViewport()
       } catch (err) {
         console.error('load consultation context failed', err)
       }
@@ -285,6 +430,10 @@ export default {
         fileName: item?.fileName || '',
         createdAt: item?.createdAt || ''
       }
+    },
+    showSenderName(message) {
+      if (!this.isConsultation || !message || message.self || message.type === 'typing') return false
+      return Boolean(String(message.senderName || '').trim())
     },
     goBack() {
       const pages = getCurrentPages()
@@ -328,6 +477,165 @@ export default {
           }
         }
       })
+    },
+    startConsultationPolling() {
+      if (!this.isConsultation || !this.consultationId || this.pollTimer) return
+      this.pollTimer = setInterval(() => {
+        this.pollConsultationMessages({ silent: false, forceScroll: false })
+      }, CONSULTATION_POLL_INTERVAL)
+    },
+    stopConsultationPolling() {
+      if (!this.pollTimer) return
+      clearInterval(this.pollTimer)
+      this.pollTimer = null
+    },
+    async pollConsultationMessages({ silent = false, forceScroll = false } = {}) {
+      if (!this.isConsultation || !this.consultationId || this.pollingBusy) return 0
+      this.pollingBusy = true
+      try {
+        const payload = await listConsultationMessages(this.consultationId, { limit: CONSULTATION_POLL_LIMIT })
+        const list = Array.isArray(payload) ? payload.slice().reverse() : []
+        const mapped = list.map((item) => this.mapConsultationMessage(item))
+        const added = this.mergeConsultationMessages(mapped, forceScroll)
+        if (!added) {
+          this.trackLatestRemoteMessage(mapped)
+        }
+        return added
+      } catch (err) {
+        console.error('poll consultation messages failed', err)
+        if (!silent) this.notifyPollError()
+        return 0
+      } finally {
+        this.pollingBusy = false
+      }
+    },
+    mergeConsultationMessages(incoming, forceScroll = false) {
+      if (!Array.isArray(incoming) || !incoming.length) return 0
+      const existingIds = new Set(
+        this.messages
+          .map((message) => this.toNumberMessageId(message))
+          .filter((id) => id !== null)
+      )
+      const additions = []
+
+      incoming.forEach((message) => {
+        const id = this.toNumberMessageId(message)
+        if (id !== null) {
+          if (existingIds.has(id)) return
+          existingIds.add(id)
+        }
+        additions.push(message)
+      })
+
+      if (!additions.length) return 0
+      const merged = [...this.messages, ...additions]
+      merged.sort((a, b) => {
+        const aid = this.toNumberMessageId(a)
+        const bid = this.toNumberMessageId(b)
+        if (aid !== null && bid !== null) return aid - bid
+        if (aid !== null) return -1
+        if (bid !== null) return 1
+        return 0
+      })
+      this.messages = merged
+      this.trackLatestRemoteMessage(merged)
+      const latest = additions[additions.length - 1]
+      this.scrollToBottom(latest?.id, forceScroll || this.isNearBottom)
+      return additions.length
+    },
+    trackLatestRemoteMessage(messages) {
+      const latest = this.computeLastRemoteMessageId(messages)
+      if (latest > this.lastRemoteMessageId) {
+        this.lastRemoteMessageId = latest
+      }
+    },
+    computeLastRemoteMessageId(messages) {
+      if (!Array.isArray(messages) || !messages.length) return 0
+      return messages.reduce((max, message) => {
+        const id = this.toNumberMessageId(message)
+        if (id === null) return max
+        return id > max ? id : max
+      }, 0)
+    },
+    toNumberMessageId(message) {
+      const raw = typeof message === 'object' ? message?.id : message
+      const num = Number(raw)
+      if (!Number.isFinite(num) || num <= 0) return null
+      return num
+    },
+    notifyPollError() {
+      const now = Date.now()
+      if (now - this.pollErrorToastAt < POLL_ERROR_TOAST_GAP) return
+      this.pollErrorToastAt = now
+      uni.showToast({ title: '消息同步失败，正在重试', icon: 'none' })
+    },
+    normalizeKeyboardHeight(rawHeight) {
+      const height = Number(rawHeight || 0)
+      if (!Number.isFinite(height) || height <= 0) return 0
+      const baseline = this.currentWindowHeight || this.baseWindowHeight || 0
+      if (!baseline) return height
+      const maxReasonable = Math.floor(baseline * 0.6)
+      return Math.min(height, maxReasonable)
+    },
+    refreshWindowHeight(resetBaseline = false) {
+      let windowHeight = 0
+      if (typeof uni.getWindowInfo === 'function') {
+        windowHeight = Number(uni.getWindowInfo()?.windowHeight || 0)
+      } else if (typeof uni.getSystemInfoSync === 'function') {
+        windowHeight = Number(uni.getSystemInfoSync()?.windowHeight || 0)
+      }
+      if (windowHeight <= 0) return
+      this.currentWindowHeight = windowHeight
+      if (resetBaseline || !this.baseWindowHeight || windowHeight > this.baseWindowHeight) {
+        this.baseWindowHeight = windowHeight
+      }
+    },
+    handleInputKeyboardHeightChange(detail) {
+      const next = this.normalizeKeyboardHeight(detail?.height)
+      this.keyboardHeight = next
+      this.refreshWindowHeight(false)
+    },
+    bindWindowResize() {
+      if (this.windowResizeBound || typeof uni.onWindowResize !== 'function') return
+      this.windowResizeHandler = (res) => {
+        const next = Number(res?.size?.windowHeight || res?.windowHeight || 0)
+        if (next <= 0) return
+        this.currentWindowHeight = next
+        if (!this.baseWindowHeight || next > this.baseWindowHeight) {
+          this.baseWindowHeight = next
+        }
+      }
+      uni.onWindowResize(this.windowResizeHandler)
+      this.windowResizeBound = true
+    },
+    unbindWindowResize() {
+      if (!this.windowResizeBound || typeof uni.offWindowResize !== 'function') return
+      uni.offWindowResize(this.windowResizeHandler)
+      this.windowResizeBound = false
+      this.windowResizeHandler = null
+    },
+    bindKeyboardHeightChange() {
+      if (this.keyboardListenerBound || typeof uni.onKeyboardHeightChange !== 'function') return
+      this.keyboardHeightHandler = (res) => {
+        const next = this.normalizeKeyboardHeight(res?.height)
+        this.keyboardHeight = next
+        this.refreshWindowHeight(false)
+        if (this.keyboardHeight > 0) {
+          this.scrollToBottom(undefined, true)
+        } else {
+          setTimeout(() => {
+            this.refreshWindowHeight(true)
+          }, 60)
+        }
+      }
+      uni.onKeyboardHeightChange(this.keyboardHeightHandler)
+      this.keyboardListenerBound = true
+    },
+    unbindKeyboardHeightChange() {
+      if (!this.keyboardListenerBound || typeof uni.offKeyboardHeightChange !== 'function') return
+      uni.offKeyboardHeightChange(this.keyboardHeightHandler)
+      this.keyboardListenerBound = false
+      this.keyboardHeightHandler = null
     },
     chooseAttachment() {
       if (this.loading) return
@@ -463,7 +771,7 @@ export default {
           })
           const uploadedMessage = this.mapConsultationMessage(uploaded)
           uploadedMessage.self = true
-          this.appendLocalMessage(uploadedMessage)
+          this.appendLocalMessage(uploadedMessage, true)
           this.pendingAttachment = null
         }
 
@@ -474,10 +782,11 @@ export default {
           })
           const sentMessage = this.mapConsultationMessage(sent)
           sentMessage.self = true
-          this.appendLocalMessage(sentMessage)
+          this.appendLocalMessage(sentMessage, true)
         }
 
         this.input = ''
+        await this.pollConsultationMessages({ silent: true, forceScroll: true })
       } catch (err) {
         console.error('send consultation message failed', err)
       } finally {
@@ -522,7 +831,7 @@ export default {
             }
             if (!chunk.startsWith('[ERROR]')) {
               content += chunk
-              this.replaceTyping(typingId, content, true)
+              this.replaceTyping(typingId, content)
             }
           }
           lineEnd = buffer.indexOf('\n')
@@ -539,6 +848,186 @@ export default {
       if (payload && payload.reply && typeof payload.reply === 'object') return JSON.stringify(payload.reply, null, 2)
       return '已收到请求，但未返回有效内容。'
     },
+    rememberMarkdownCache(cache, key, value, limit = 300) {
+      if (!cache || typeof cache.set !== 'function') return
+      if (cache.has(key)) {
+        cache.set(key, value)
+        return
+      }
+      cache.set(key, value)
+      if (cache.size <= limit) return
+      const firstKey = cache.keys().next().value
+      if (firstKey !== undefined) {
+        cache.delete(firstKey)
+      }
+    },
+    getMarkdownBlocks(content) {
+      const normalized = String(content || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+      const cached = this.markdownBlockCache.get(normalized)
+      if (cached) return cached
+
+      const lines = normalized.split('\n')
+      const blocks = []
+      let index = 0
+
+      while (index < lines.length) {
+        const rawLine = lines[index]
+        const line = String(rawLine || '')
+        const trimmed = line.trim()
+
+        if (!trimmed) {
+          index += 1
+          continue
+        }
+
+        if (/^```/.test(trimmed)) {
+          const lang = trimmed.slice(3).trim()
+          index += 1
+          const codeLines = []
+          while (index < lines.length && !/^```/.test(String(lines[index] || '').trim())) {
+            codeLines.push(String(lines[index] || ''))
+            index += 1
+          }
+          if (index < lines.length) index += 1
+          blocks.push({ type: 'code', lang, text: codeLines.join('\n') })
+          continue
+        }
+
+        const headingMatch = trimmed.match(/^(#{1,6})\s+(.*)$/)
+        if (headingMatch) {
+          blocks.push({
+            type: 'heading',
+            level: headingMatch[1].length,
+            text: headingMatch[2] || ''
+          })
+          index += 1
+          continue
+        }
+
+        if (/^(-{3,}|\*{3,}|_{3,})$/.test(trimmed)) {
+          blocks.push({ type: 'hr' })
+          index += 1
+          continue
+        }
+
+        if (/^>\s?/.test(trimmed)) {
+          const quoteLines = []
+          while (index < lines.length) {
+            const quoteLine = String(lines[index] || '')
+            const quoteTrim = quoteLine.trim()
+            if (!/^>\s?/.test(quoteTrim)) break
+            quoteLines.push(quoteTrim.replace(/^>\s?/, ''))
+            index += 1
+          }
+          blocks.push({ type: 'quote', text: quoteLines.join('\n') })
+          continue
+        }
+
+        const orderedMarker = /^\d+\.\s+/
+        const unorderedMarker = /^[-*+]\s+/
+        if (orderedMarker.test(trimmed) || unorderedMarker.test(trimmed)) {
+          const ordered = orderedMarker.test(trimmed)
+          const items = []
+          while (index < lines.length) {
+            const itemLine = String(lines[index] || '')
+            const itemTrim = itemLine.trim()
+            if (ordered) {
+              const orderedMatch = itemTrim.match(/^\d+\.\s+(.*)$/)
+              if (!orderedMatch) break
+              items.push(orderedMatch[1] || '')
+              index += 1
+              continue
+            }
+            const unorderedMatch = itemTrim.match(/^[-*+]\s+(.*)$/)
+            if (!unorderedMatch) break
+            items.push(unorderedMatch[1] || '')
+            index += 1
+          }
+          blocks.push({ type: 'list', ordered, items })
+          continue
+        }
+
+        const paragraphLines = []
+        while (index < lines.length) {
+          const paragraphLine = String(lines[index] || '')
+          const paragraphTrim = paragraphLine.trim()
+          if (!paragraphTrim) break
+          if (
+            /^```/.test(paragraphTrim) ||
+            /^(#{1,6})\s+/.test(paragraphTrim) ||
+            /^>\s?/.test(paragraphTrim) ||
+            /^(-{3,}|\*{3,}|_{3,})$/.test(paragraphTrim) ||
+            orderedMarker.test(paragraphTrim) ||
+            unorderedMarker.test(paragraphTrim)
+          ) {
+            break
+          }
+          paragraphLines.push(paragraphLine)
+          index += 1
+        }
+        blocks.push({ type: 'paragraph', text: paragraphLines.join('\n') })
+      }
+
+      const result = blocks.length ? blocks : [{ type: 'paragraph', text: normalized }]
+      this.rememberMarkdownCache(this.markdownBlockCache, normalized, result, 240)
+      return result
+    },
+    getInlineSegments(text) {
+      const normalized = String(text || '')
+      const cached = this.markdownInlineCache.get(normalized)
+      if (cached) return cached
+
+      const segments = []
+      const pattern = /(`[^`]+`)|(\[([^\]]+)\]\(([^)]+)\))|(\*\*[^*]+\*\*)|(__[^_]+__)|(\*[^*]+\*)|(_[^_]+_)/g
+      let last = 0
+      let match = pattern.exec(normalized)
+      while (match) {
+        if (match.index > last) {
+          segments.push({ type: 'text', text: normalized.slice(last, match.index) })
+        }
+
+        const token = match[0]
+        if (match[1]) {
+          segments.push({ type: 'code', text: token.slice(1, -1) })
+        } else if (match[2]) {
+          segments.push({ type: 'link', text: match[3] || '', href: match[4] || '' })
+        } else if (match[5] || match[6]) {
+          segments.push({ type: 'bold', text: token.slice(2, -2) })
+        } else if (match[7] || match[8]) {
+          segments.push({ type: 'italic', text: token.slice(1, -1) })
+        } else {
+          segments.push({ type: 'text', text: token })
+        }
+
+        last = pattern.lastIndex
+        match = pattern.exec(normalized)
+      }
+
+      if (last < normalized.length) {
+        segments.push({ type: 'text', text: normalized.slice(last) })
+      }
+      if (!segments.length) {
+        segments.push({ type: 'text', text: '' })
+      }
+
+      this.rememberMarkdownCache(this.markdownInlineCache, normalized, segments, 500)
+      return segments
+    },
+    inlineClass(segment) {
+      const type = String(segment?.type || '')
+      return {
+        'md-inline--bold': type === 'bold',
+        'md-inline--italic': type === 'italic',
+        'md-inline--code': type === 'code',
+        'md-inline--link': type === 'link'
+      }
+    },
+    handleInlineClick(segment) {
+      if (!segment || segment.type !== 'link') return
+      const href = String(segment.href || '').trim()
+      if (!/^https?:\/\//i.test(href)) return
+      this.openOssPath(href)
+    },
     appendTyping() {
       const id = `typing-${Date.now()}-${Math.random().toString(16).slice(2)}`
       this.messages.push({
@@ -548,7 +1037,7 @@ export default {
         content: '',
         createdAt: ''
       })
-      this.scrollToBottom(id)
+      this.scrollToBottom(id, true)
       return id
     },
     replaceTyping(id, content) {
@@ -556,19 +1045,60 @@ export default {
       if (!target) return
       target.type = 'TEXT'
       target.content = content || ' '
-      this.scrollToBottom(id)
+      this.scrollToBottom(id, true)
     },
-    appendLocalMessage(message) {
+    appendLocalMessage(message, forceScroll = true) {
       if (!message) return
       this.messages.push(message)
-      this.scrollToBottom(message.id)
+      if (this.isConsultation) {
+        this.trackLatestRemoteMessage([message])
+      }
+      this.scrollToBottom(message.id, forceScroll)
     },
-    scrollToBottom(id) {
+    handleMessageScroll(event) {
+      const detail = event?.detail || {}
+      const scrollTop = Number(detail.scrollTop || 0)
+      const scrollHeight = Number(detail.scrollHeight || 0)
+      if (!this.listViewportHeight) {
+        this.measureMessageListViewport()
+      }
+      const viewportHeight = Number(this.listViewportHeight || 0)
+      if (!scrollHeight || !viewportHeight) return
+      const remain = scrollHeight - (scrollTop + viewportHeight)
+      this.isNearBottom = remain <= NEAR_BOTTOM_THRESHOLD
+    },
+    handleScrollToLower() {
+      this.isNearBottom = true
+    },
+    measureMessageListViewport() {
+      this.$nextTick(() => {
+        const query = uni.createSelectorQuery().in(this)
+        query
+          .select('.message-list')
+          .boundingClientRect((rect) => {
+            if (rect?.height) {
+              this.listViewportHeight = rect.height
+            }
+          })
+          .exec()
+      })
+    },
+    scrollToBottom(id, force = true) {
+      if (!force) return
       this.$nextTick(() => {
         const target = id || (this.messages.length ? this.messages[this.messages.length - 1].id : '')
-        if (target !== undefined && target !== null) {
-          this.scrollTarget = this.toAnchorId(target)
+        if (target === undefined || target === null) return
+        const anchor = this.toAnchorId(target)
+        if (!anchor) return
+        if (this.scrollTarget === anchor) {
+          this.scrollTarget = ''
+          this.$nextTick(() => {
+            this.scrollTarget = anchor
+          })
+        } else {
+          this.scrollTarget = anchor
         }
+        this.isNearBottom = true
       })
     },
     toAnchorId(id) {
@@ -624,9 +1154,13 @@ export default {
 <style scoped>
 .page {
   height: 100vh;
-  background: #edf4ff;
+  background:
+    radial-gradient(560rpx 260rpx at -6% -5%, rgba(129, 181, 255, 0.18), transparent 70%),
+    radial-gradient(640rpx 280rpx at 108% 2%, rgba(166, 207, 255, 0.14), transparent 68%),
+    #edf4ff;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .header {
@@ -687,10 +1221,11 @@ export default {
 }
 
 .context-strip {
-  padding: 12rpx 20rpx 10rpx;
+  padding: 12rpx 20rpx 8rpx;
   display: flex;
+  flex-wrap: wrap;
   gap: 10rpx;
-  background: #edf4ff;
+  background: transparent;
 }
 
 .context-chip {
@@ -703,12 +1238,12 @@ export default {
 }
 
 .member-panel {
-  margin: 0 20rpx 10rpx;
-  padding: 14rpx;
-  border-radius: 18rpx;
-  border: 1rpx solid #d6e5f7;
+  margin: 0 20rpx 12rpx;
+  padding: 16rpx;
+  border-radius: 20rpx;
+  border: 1rpx solid #d0e2f7;
   background: #ffffff;
-  box-shadow: 0 10rpx 24rpx rgba(47, 105, 182, 0.1);
+  box-shadow: 0 14rpx 30rpx rgba(47, 105, 182, 0.12);
 }
 
 .member-panel-head {
@@ -747,9 +1282,9 @@ export default {
   align-items: center;
   gap: 8rpx;
   border: 1rpx solid #e1ecfa;
-  border-radius: 14rpx;
+  border-radius: 16rpx;
   background: #f8fbff;
-  padding: 10rpx 12rpx;
+  padding: 12rpx 14rpx;
 }
 
 .member-name,
@@ -781,14 +1316,15 @@ export default {
 .message-list {
   flex: 1;
   min-height: 0;
-  padding: 12rpx 24rpx 8rpx;
+  padding: 16rpx 24rpx 12rpx;
+  box-sizing: border-box;
 }
 
 .message {
   display: flex;
   align-items: flex-start;
-  gap: 16rpx;
-  max-width: 94%;
+  gap: 14rpx;
+  max-width: 96%;
 }
 
 .message + .message {
@@ -797,7 +1333,7 @@ export default {
 
 .message.user {
   margin-left: auto;
-  margin-right: 30rpx;
+  margin-right: 0;
   flex-direction: row-reverse;
 }
 
@@ -826,8 +1362,8 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 6rpx;
-  max-width: 74%;
+  gap: 8rpx;
+  max-width: 78%;
 }
 
 .message.user .bubble-wrap {
@@ -835,11 +1371,11 @@ export default {
 }
 
 .bubble {
-  padding: 16rpx 18rpx;
-  border-radius: 20rpx;
+  padding: 16rpx 20rpx;
+  border-radius: 22rpx;
   background: #ffffff;
-  border: 1rpx solid #d6e5f7;
-  box-shadow: 0 10rpx 24rpx rgba(47, 105, 182, 0.1);
+  border: 1rpx solid #d3e4f8;
+  box-shadow: 0 12rpx 26rpx rgba(47, 105, 182, 0.11);
   line-height: 1.5;
   font-size: 26rpx;
   color: #203854;
@@ -853,12 +1389,14 @@ export default {
   background: linear-gradient(140deg, #2f78d8 0%, #4a95ec 100%);
   border-color: transparent;
   color: #ffffff;
-  box-shadow: 0 12rpx 24rpx rgba(47, 120, 216, 0.3);
+  box-shadow: 0 12rpx 28rpx rgba(47, 120, 216, 0.3);
 }
 
 .sender-name {
   font-size: 22rpx;
-  color: #6b85a5;
+  line-height: 1.2;
+  color: #5f7da1;
+  margin-left: 2rpx;
 }
 
 .msg-text {
@@ -866,6 +1404,156 @@ export default {
   line-height: 1.5;
   white-space: pre-wrap;
   color: inherit;
+}
+
+.md-content {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.md-block {
+  width: 100%;
+}
+
+.md-paragraph,
+.md-heading,
+.md-list-text,
+.md-quote-text,
+.md-code-text {
+  display: block;
+  font-size: 26rpx;
+  line-height: 1.58;
+  color: inherit;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.md-heading {
+  font-weight: 700;
+  line-height: 1.48;
+}
+
+.md-heading--1 {
+  font-size: 33rpx;
+}
+
+.md-heading--2 {
+  font-size: 31rpx;
+}
+
+.md-heading--3 {
+  font-size: 29rpx;
+}
+
+.md-heading--4,
+.md-heading--5,
+.md-heading--6 {
+  font-size: 27rpx;
+}
+
+.md-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+
+.md-list-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8rpx;
+}
+
+.md-list-marker {
+  min-width: 26rpx;
+  font-size: 26rpx;
+  line-height: 1.58;
+  color: #7a95b8;
+}
+
+.md-list-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.md-quote {
+  border-left: 6rpx solid #b6d0ef;
+  background: #f2f8ff;
+  border-radius: 10rpx;
+  padding: 10rpx 12rpx;
+}
+
+.md-code {
+  border-radius: 12rpx;
+  border: 1rpx solid #cfe1f5;
+  background: #f4f8ff;
+  padding: 10rpx 12rpx;
+}
+
+.md-code-lang {
+  display: block;
+  margin-bottom: 4rpx;
+  font-size: 20rpx;
+  color: #6e89a9;
+}
+
+.md-code-text {
+  font-family: 'JetBrains Mono', 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+  font-size: 24rpx;
+}
+
+.md-hr {
+  height: 1rpx;
+  margin: 10rpx 0;
+  background: linear-gradient(90deg, transparent, #b7d1ef, transparent);
+}
+
+.md-inline--bold {
+  font-weight: 700;
+}
+
+.md-inline--italic {
+  font-style: italic;
+}
+
+.md-inline--code {
+  font-family: 'JetBrains Mono', 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+  padding: 0 6rpx;
+  margin: 0 2rpx;
+  border-radius: 8rpx;
+  background: rgba(31, 67, 111, 0.08);
+}
+
+.md-inline--link {
+  color: #236ecb;
+  text-decoration: underline;
+  text-decoration-thickness: 1.5rpx;
+}
+
+.bubble.user .md-quote {
+  border-left-color: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.bubble.user .md-code {
+  border-color: rgba(255, 255, 255, 0.46);
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.bubble.user .md-code-lang,
+.bubble.user .md-list-marker {
+  color: rgba(255, 255, 255, 0.84);
+}
+
+.bubble.user .md-inline--code {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.bubble.user .md-inline--link {
+  color: #eaf4ff;
 }
 
 .message-image {
@@ -908,7 +1596,7 @@ export default {
 
 .msg-time {
   font-size: 20rpx;
-  color: #88a0be;
+  color: #8199b6;
 }
 
 .typing {
@@ -947,12 +1635,17 @@ export default {
   }
 }
 
+.composer-wrap {
+  transition: transform 0.2s ease;
+  will-change: transform;
+}
+
 .input-preview {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12rpx;
-  padding: 10rpx 20rpx;
+  padding: 10rpx 20rpx 8rpx;
   background: #ffffff;
   border-top: 1rpx solid #d6e5f7;
 }
@@ -1021,5 +1714,6 @@ export default {
   background: #f4f8ff;
   border-radius: 14rpx;
   border: 1rpx solid #d6e5f7;
+  box-sizing: border-box;
 }
 </style>

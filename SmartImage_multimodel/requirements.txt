@@ -38,7 +38,7 @@ langgraph==0.1.10
 langgraph-checkpoint-redis==0.3.3
 
 # =========================
-# Token / Embedding / Async 鏀寔
+# Token / Embedding / Async
 # =========================
 tiktoken>=0.7.0
 aiohttp>=3.8.0
@@ -49,7 +49,7 @@ posthog<=3.1.0
 pydantic>=2.0
 
 # =========================
-# 鏃ュ織 / 鎬ц兘
+#
 # =========================
 loguru==0.7.2
 psutil>=5.9.0

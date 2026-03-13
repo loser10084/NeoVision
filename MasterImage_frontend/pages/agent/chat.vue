@@ -272,14 +272,17 @@ export default {
 <style scoped>
 .page {
   min-height: 100vh;
-  background: #edf4ff;
+  background:
+    radial-gradient(560rpx 280rpx at -8% -6%, rgba(129, 181, 255, 0.2), transparent 68%),
+    radial-gradient(620rpx 300rpx at 106% 2%, rgba(164, 205, 255, 0.14), transparent 66%),
+    #edf4ff;
 }
 
 .hero {
   background: linear-gradient(155deg, #2f78d8 0%, #3888ee 44%, #62a6f4 100%);
-  border-bottom-left-radius: 26rpx;
-  border-bottom-right-radius: 26rpx;
-  box-shadow: 0 14rpx 44rpx rgba(42, 106, 188, 0.28);
+  border-bottom-left-radius: 30rpx;
+  border-bottom-right-radius: 30rpx;
+  box-shadow: 0 16rpx 48rpx rgba(42, 106, 188, 0.28);
 }
 
 .hero-inner {
@@ -331,10 +334,10 @@ export default {
 
 .quick-card {
   background: #ffffff;
-  border-radius: 24rpx;
-  border: 1rpx solid #d6e5f7;
-  box-shadow: 0 14rpx 36rpx rgba(47, 105, 182, 0.12);
-  padding: 22rpx;
+  border-radius: 26rpx;
+  border: 1rpx solid #d2e4f8;
+  box-shadow: 0 16rpx 38rpx rgba(47, 105, 182, 0.12);
+  padding: 24rpx;
   display: flex;
   align-items: center;
   gap: 16rpx;
@@ -368,15 +371,15 @@ export default {
 
 .quick-title {
   display: block;
-  font-size: 30rpx;
-  font-weight: 650;
+  font-size: 31rpx;
+  font-weight: 700;
   color: #173a64;
 }
 
 .quick-desc {
   display: block;
   margin-top: 4rpx;
-  font-size: 24rpx;
+  font-size: 23rpx;
   color: #6a84a5;
 }
 
@@ -384,7 +387,7 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10rpx;
+  margin: 4rpx 0 12rpx;
 }
 
 .section-title {
@@ -411,9 +414,10 @@ export default {
 
 .state-card {
   background: #ffffff;
-  border-radius: 22rpx;
-  border: 1rpx solid #d6e5f7;
+  border-radius: 24rpx;
+  border: 1rpx solid #d2e4f8;
   padding: 30rpx 24rpx;
+  box-shadow: 0 12rpx 30rpx rgba(47, 105, 182, 0.08);
 }
 
 .state-text {
@@ -428,11 +432,21 @@ export default {
 }
 
 .consultation-item {
+  position: relative;
+  overflow: hidden;
   background: #ffffff;
-  border-radius: 22rpx;
-  border: 1rpx solid #d6e5f7;
-  box-shadow: 0 12rpx 32rpx rgba(47, 105, 182, 0.1);
-  padding: 20rpx;
+  border-radius: 24rpx;
+  border: 1rpx solid #d1e3f8;
+  box-shadow: 0 14rpx 34rpx rgba(47, 105, 182, 0.1);
+  padding: 20rpx 22rpx;
+}
+
+.consultation-item::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 8rpx;
+  background: linear-gradient(180deg, #2f78d8 0%, #74b0f3 100%);
 }
 
 .consultation-top {
@@ -462,7 +476,7 @@ export default {
   display: block;
   margin-top: 8rpx;
   font-size: 22rpx;
-  color: #7090b2;
+  color: #6488b0;
 }
 
 .consultation-preview {
@@ -472,16 +486,20 @@ export default {
   color: #5f7899;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.45;
 }
 
 .overlay {
   position: fixed;
   inset: 0;
   z-index: 99;
-  background: rgba(17, 39, 68, 0.38);
+  background: rgba(17, 39, 68, 0.4);
   display: flex;
   align-items: flex-end;
+  backdrop-filter: blur(2rpx);
 }
 
 .dialog {
@@ -489,13 +507,14 @@ export default {
   min-height: 56vh;
   max-height: 88vh;
   background: #ffffff;
-  border-top-left-radius: 28rpx;
-  border-top-right-radius: 28rpx;
-  padding: 24rpx;
+  border-top-left-radius: 32rpx;
+  border-top-right-radius: 32rpx;
+  padding: 24rpx 24rpx calc(24rpx + env(safe-area-inset-bottom));
   overflow: hidden;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
+  box-shadow: 0 -12rpx 40rpx rgba(20, 57, 102, 0.16);
 }
 
 .dialog-header {
@@ -529,11 +548,15 @@ export default {
   max-height: 58vh;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: 12rpx;
+  padding-bottom: 14rpx;
 }
 
 .dialog-field {
-  margin-bottom: 16rpx;
+  margin-bottom: 18rpx;
+  padding: 14rpx;
+  border-radius: 18rpx;
+  border: 1rpx solid #d7e7f8;
+  background: #f8fbff;
 }
 
 .dialog-label-row {
@@ -548,6 +571,7 @@ export default {
   margin-bottom: 8rpx;
   font-size: 26rpx;
   color: #345a84;
+  font-weight: 600;
 }
 
 .dialog-sub {
@@ -562,15 +586,17 @@ export default {
 }
 
 .friend-pill {
-  border: 1rpx solid #d6e5f7;
+  border: 1rpx solid #d4e6f8;
   border-radius: 18rpx;
   padding: 12rpx 14rpx;
-  background: #f8fbff;
+  background: #ffffff;
+  box-shadow: 0 8rpx 20rpx rgba(47, 105, 182, 0.07);
 }
 
 .friend-pill--active {
-  border-color: #88b5ea;
-  background: #edf4ff;
+  border-color: #7eaee7;
+  background: #edf5ff;
+  box-shadow: 0 10rpx 24rpx rgba(47, 105, 182, 0.13);
 }
 
 .friend-pill-name {
@@ -591,8 +617,21 @@ export default {
   font-size: 24rpx;
   color: #7c98b8;
   padding: 12rpx;
-  background: #f8fbff;
+  background: #ffffff;
   border-radius: 14rpx;
+  border: 1rpx dashed #bfd7f3;
+}
+
+:deep(.dialog .wd-input) {
+  background: #ffffff;
+  border: 1rpx solid #cfe1f5;
+  border-radius: 14rpx;
+  min-height: 72rpx;
+  box-sizing: border-box;
+}
+
+:deep(.dialog .wd-input__inner) {
+  font-size: 26rpx;
 }
 
 

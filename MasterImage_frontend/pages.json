@@ -47,7 +47,10 @@
         "navigationStyle": "custom",
         "navigationBarTitleText": "\u4f1a\u8bca\u5bf9\u8bdd",
         "navigationBarBackgroundColor": "#ffffff",
-        "navigationBarTextStyle": "black"
+        "navigationBarTextStyle": "black",
+        "app-plus": {
+          "softinputMode": "adjustResize"
+        }
       }
     },
     {

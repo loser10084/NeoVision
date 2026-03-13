@@ -638,15 +638,35 @@ export default {
       return resolveStudyResourceUrl(raw)
     },
     normalizeIncomingUrl(raw) {
-      if (!raw) return ''
-      let target = raw
-      try {
-        target = decodeURIComponent(String(raw))
-      } catch (err) {
-        target = String(raw)
-      }
+      const target = this.decodeIncomingUrl(raw)
+      if (!target) return ''
       if (/^https?:\/\//i.test(target)) return target
       return resolveModelUrl(target)
+    },
+    decodeIncomingUrl(raw) {
+      let value = String(raw || '').trim()
+      if (!value) return ''
+      for (let i = 0; i < 3; i += 1) {
+        let decoded = value
+        try {
+          decoded = decodeURIComponent(value)
+        } catch (err) {
+          decoded = value
+        }
+        if (!decoded || decoded === value) break
+        value = decoded
+        if (/^https?:\/\//i.test(value)) break
+      }
+      if (/^https?:%2f%2f/i.test(value)) {
+        try {
+          value = decodeURIComponent(value)
+        } catch (err) {}
+      }
+      if (/^https?:%2f%2f/i.test(value)) {
+        value = value.replace(/^(https?):%2f%2f/i, '$1://')
+      }
+      value = value.replace(/^(https?):\/(?!\/)/i, '$1://')
+      return value
     },
     autoLoadIfReady() {
       if (!this.runtimeSupported || !this.glReady || this.autoLoaded) return
@@ -665,12 +685,15 @@ export default {
     buildAppWebViewSrc(query = {}) {
       const urls = getEffectiveServiceUrls()
       const token = getToken() || ''
+      const volumeUrl = this.decodeIncomingUrl(query.volumeUrl || query.modelUrl || '')
+      const labelUrl = this.decodeIncomingUrl(query.labelUrl || '')
+      const heatmapUrl = this.decodeIncomingUrl(query.heatmapUrl || '')
       const payload = {
         studyId: query.studyId || this.studyId || '',
         view: query.view || query.mode || this.viewMode || 'both',
-        volumeUrl: query.volumeUrl || query.modelUrl || '',
-        labelUrl: query.labelUrl || '',
-        heatmapUrl: query.heatmapUrl || '',
+        volumeUrl,
+        labelUrl,
+        heatmapUrl,
         gatewayUrl: urls.gatewayUrl || '',
         modelUrl: urls.modelUrl || '',
         token
@@ -1471,5 +1494,4 @@ void main() {
   font-size: 24rpx;
 }
 </style>
-
 
