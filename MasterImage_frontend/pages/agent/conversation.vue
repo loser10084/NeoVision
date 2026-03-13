@@ -86,7 +86,7 @@
                 @click="openOssPath(message.ossPath)"
               />
 
-              <view v-if="message.type !== 'TEXT' && message.type !== 'IMAGE'" class="file-box" @click="openOssPath(message.ossPath)">
+              <view v-if="message.type !== 'TEXT' && message.type !== 'IMAGE'" class="file-box" @click="downloadAttachment(message)">
                 <wd-icon name="folder" size="20" color="#2f78d8" />
                 <view class="file-meta">
                   <text class="file-name">{{ message.fileName || message.type || '附件' }}</text>
@@ -231,11 +231,13 @@ import {
   removeConsultationMember
 } from '../../common/api'
 import { resolveModelUrl, getToken } from '../../common/request'
+import { downloadWithMobileSupport } from '../../common/mobile-download'
 
 const CONSULTATION_POLL_INTERVAL = 2000
 const CONSULTATION_POLL_LIMIT = 30
 const NEAR_BOTTOM_THRESHOLD = 120
 const POLL_ERROR_TOAST_GAP = 12000
+const AGENT_PATIENT_SEARCH_KEY = 'agent_patient_search_keyword'
 
 export default {
   data() {
@@ -295,6 +297,10 @@ export default {
     },
     keyboardOffset() {
       if (this.keyboardHeight <= 0) return 0
+      // Android App-Plus uses adjustResize (pages.json), avoid double-lifting the composer.
+      if (typeof plus !== 'undefined' && String(plus?.os?.name || '').toLowerCase() === 'android') {
+        return 0
+      }
       const shrink = Math.max(0, this.baseWindowHeight - this.currentWindowHeight)
       const offset = this.keyboardHeight - shrink
       return offset > 0 ? offset : 0
@@ -669,24 +675,586 @@ export default {
         }
       })
     },
-    pickFile() {
-      if (typeof uni.chooseMessageFile !== 'function') {
-        uni.showToast({ title: '当前端不支持文件选择', icon: 'none' })
-        return
+    async pickFile() {
+      try {
+        const picked = await this.chooseSingleAttachmentFile()
+        if (!picked) return
+        let normalized = this.normalizePickedAttachment(picked)
+        normalized = await this.prepareAttachmentForUpload(normalized)
+        if (!normalized || !normalized.filePath) {
+          uni.showToast({ title: '文件读取失败，请重新选择', icon: 'none' })
+          return
+        }
+        this.pendingAttachment = {
+          path: normalized.filePath,
+          name: normalized.name || this.extractFileName(normalized.filePath),
+          size: Number(normalized.size || 0),
+          type: this.detectAttachmentType(normalized.name || normalized.filePath)
+        }
+      } catch (err) {
+        if (this.isChooseCancelled(err)) return
+        console.error('pick consultation file failed', err)
+        uni.showToast({ title: this.pickErrorText(err) || '文件选择失败', icon: 'none' })
       }
-      uni.chooseMessageFile({
-        count: 1,
-        type: 'file',
-        success: (res) => {
-          const file = res.tempFiles && res.tempFiles[0]
-          if (!file?.path) return
-          this.pendingAttachment = {
-            path: file.path,
-            name: file.name || this.extractFileName(file.path),
-            type: this.detectAttachmentType(file.name || file.path)
+    },
+    async chooseSingleAttachmentFile() {
+      let lastError = null
+      if (this.isAppPlusRuntime()) {
+        const byPlus = await this.tryChooseByPlusFile().catch((err) => {
+          lastError = err
+          return null
+        })
+        if (byPlus) return byPlus
+      }
+      const byMessage = await this.tryChooseByUniApi('chooseMessageFile', {
+        type: 'file'
+      }).catch((err) => {
+        lastError = err
+        return null
+      })
+      if (byMessage) return byMessage
+      const byFile = await this.tryChooseByUniApi('chooseFile').catch((err) => {
+        lastError = err
+        return null
+      })
+      if (byFile) return byFile
+      const byIntent = await this.tryChooseByAndroidIntent('*/*').catch((err) => {
+        lastError = err
+        return null
+      })
+      if (byIntent) return byIntent
+      if (lastError) throw lastError
+      throw new Error('choose file api unavailable')
+    },
+    tryChooseByUniApi(apiName, extraOptions = {}) {
+      const choose = uni?.[apiName]
+      if (typeof choose !== 'function') return Promise.resolve(null)
+      return new Promise((resolve, reject) => {
+        choose({
+          count: 1,
+          ...extraOptions,
+          success: (res) => {
+            const first = (res.tempFiles || [])[0]
+            if (first) {
+              resolve(first)
+              return
+            }
+            const fallbackPath = Array.isArray(res.tempFilePaths) ? (res.tempFilePaths[0] || '') : ''
+            if (fallbackPath) {
+              resolve({
+                path: fallbackPath,
+                tempFilePath: fallbackPath,
+                name: this.extractFileName(fallbackPath)
+              })
+              return
+            }
+            resolve(null)
+          },
+          fail: (err) => {
+            if (this.isChooseCancelled(err)) {
+              resolve(null)
+              return
+            }
+            reject(err)
+          }
+        })
+      })
+    },
+    tryChooseByPlusFile() {
+      if (typeof plus === 'undefined' || !plus.io || typeof plus.io.chooseFile !== 'function') {
+        return Promise.resolve(null)
+      }
+      return new Promise((resolve, reject) => {
+        let settled = false
+        const finish = (err, value = null) => {
+          if (settled) return
+          settled = true
+          if (err) {
+            if (this.isChooseCancelled(err)) {
+              resolve(null)
+              return
+            }
+            reject(err)
+            return
+          }
+          resolve(value)
+        }
+        const consumeResult = async (result) => {
+          try {
+            const normalized = await this.normalizePlusChosenResult(result)
+            finish(null, normalized)
+          } catch (err) {
+            finish(err)
           }
         }
+        try {
+          const maybeTask = plus.io.chooseFile(
+            {
+              count: 1,
+              multiple: false,
+              title: 'Select File'
+            },
+            (res) => consumeResult(res),
+            (err) => finish(err)
+          )
+          if (maybeTask && typeof maybeTask.then === 'function') {
+            maybeTask.then((res) => consumeResult(res)).catch((err) => finish(err))
+            return
+          }
+          if (this.looksLikePlusChooseResult(maybeTask)) {
+            consumeResult(maybeTask)
+          }
+        } catch (err) {
+          finish(err)
+        }
       })
+    },
+    tryChooseByAndroidIntent(mimeType = '*/*') {
+      if (!this.isAppPlusRuntime() || String(plus.os?.name || '').toLowerCase() !== 'android') {
+        return Promise.resolve(null)
+      }
+      return new Promise((resolve, reject) => {
+        const main = plus.android.runtimeMainActivity()
+        if (!main) {
+          resolve(null)
+          return
+        }
+        const Intent = plus.android.importClass('android.content.Intent')
+        const Activity = plus.android.importClass('android.app.Activity')
+        const requestCode = Number(Date.now() % 60000) + 1000
+        const previous = main.onActivityResult
+        let settled = false
+        const finish = (err, value = null) => {
+          if (settled) return
+          settled = true
+          main.onActivityResult = previous
+          if (err) {
+            if (this.isChooseCancelled(err)) {
+              resolve(null)
+              return
+            }
+            reject(err)
+            return
+          }
+          resolve(value)
+        }
+        const self = this
+        main.onActivityResult = function(request, resultCode, data) {
+          if (request !== requestCode) {
+            if (typeof previous === 'function') previous(request, resultCode, data)
+            return
+          }
+          if (resultCode !== Activity.RESULT_OK || !data) {
+            finish(null, null)
+            return
+          }
+          try {
+            const uri = data.getData && data.getData()
+            if (!uri) {
+              finish(null, null)
+              return
+            }
+            plus.android.importClass(uri)
+            const uriString = String(uri.toString ? uri.toString() : '')
+            if (!uriString) {
+              finish(null, null)
+              return
+            }
+            const meta = self.queryContentUriMeta(uriString)
+            finish(null, {
+              path: uriString,
+              tempFilePath: uriString,
+              name: meta.name || self.extractFileName(uriString),
+              size: Number(meta.size || 0)
+            })
+          } catch (err) {
+            finish(err)
+          }
+        }
+        try {
+          const intent = new Intent(Intent.ACTION_GET_CONTENT)
+          intent.addCategory(Intent.CATEGORY_OPENABLE)
+          intent.setType(mimeType || '*/*')
+          intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+          const chooser = Intent.createChooser(intent, 'Select File')
+          main.startActivityForResult(chooser, requestCode)
+        } catch (err) {
+          finish(err)
+        }
+      })
+    },
+    looksLikePlusChooseResult(result) {
+      if (!result) return false
+      if (typeof result === 'string') return true
+      if (Array.isArray(result) && result.length) return true
+      if (Array.isArray(result.files) && result.files.length) return true
+      return !!(result.path || result.filePath || result.tempFilePath || result.file)
+    },
+    async normalizePlusChosenResult(result) {
+      const first = this.pickFirstChosenFile(result)
+      if (!first) return null
+      const rawPath = typeof first === 'string'
+        ? first
+        : first.path || first.filePath || first.tempFilePath || first.url || ''
+      const filePath = this.normalizeNativeFilePath(rawPath)
+      if (!filePath) return null
+      const fallbackName = typeof first === 'string'
+        ? this.extractFileName(filePath)
+        : first.name || this.extractFileName(filePath)
+      const fallbackSize = typeof first === 'string' ? 0 : Number(first.size || 0)
+      const localMeta = await this.readLocalFileMeta(filePath)
+      return {
+        name: localMeta.name || fallbackName || 'attachment',
+        size: Number(localMeta.size || fallbackSize || 0),
+        path: filePath,
+        tempFilePath: filePath
+      }
+    },
+    pickFirstChosenFile(result) {
+      if (!result) return null
+      if (typeof result === 'string') return result
+      if (Array.isArray(result)) return result[0] || null
+      if (Array.isArray(result.files)) return result.files[0] || null
+      if (result.file) return result.file
+      if (result.path || result.filePath || result.tempFilePath || result.url) return result
+      return null
+    },
+    extractPickedPath(file) {
+      if (!file) return ''
+      const direct = [
+        file.filePath,
+        file.path,
+        file.tempFilePath,
+        file.uri,
+        file.localPath,
+        file.savedFilePath,
+        file.apFilePath,
+        file.url
+      ].find((v) => typeof v === 'string' && v.trim())
+      if (direct) return direct
+      if (Array.isArray(file.tempFilePaths)) {
+        const first = file.tempFilePaths[0]
+        if (typeof first === 'string' && first.trim()) return first
+      }
+      return ''
+    },
+    normalizePickedAttachment(file) {
+      if (!file) return null
+      const filePath = this.extractPickedPath(file)
+      return {
+        name: file.name || file.file?.name || this.extractFileName(filePath) || 'attachment',
+        size: Number(file.size || file.file?.size || 0),
+        filePath,
+        fileObj: file.file || null
+      }
+    },
+    normalizeNativeFilePath(path) {
+      const raw = String(path || '').trim()
+      if (!raw) return ''
+      if (/^file:\/\//i.test(raw)) {
+        const pure = raw.replace(/^file:\/\//i, '')
+        try {
+          return decodeURIComponent(pure)
+        } catch (err) {
+          return pure
+        }
+      }
+      return raw
+    },
+    isAppPlusRuntime() {
+      return typeof plus !== 'undefined' && !!plus.io
+    },
+    isAppPrivatePath(path) {
+      const value = String(path || '').toLowerCase()
+      return value.startsWith('_doc/') || value.startsWith('_documents/') || value.startsWith('_www/')
+    },
+    toResolvableLocalUrl(path) {
+      const value = String(path || '').trim()
+      if (!value) return ''
+      if (/^(file|content):\/\//i.test(value)) return value
+      if (value.startsWith('/')) return `file://${value}`
+      return value
+    },
+    buildSafeCopyName(name = '') {
+      const fallback = 'attachment'
+      const base = String(name || fallback).trim() || fallback
+      const sanitized = base.replace(/[\\/:*?"<>|]/g, '_')
+      const dot = sanitized.lastIndexOf('.')
+      const stem = dot > 0 ? sanitized.slice(0, dot) : sanitized
+      const ext = dot > 0 ? sanitized.slice(dot) : ''
+      return `${stem}_${Date.now()}${ext}`
+    },
+    async prepareAttachmentForUpload(file) {
+      if (!file) return null
+      const path = this.normalizeNativeFilePath(this.extractPickedPath(file) || file.filePath)
+      if (!path) return file
+      let next = { ...file, filePath: path }
+      const isContentUri = /^content:\/\//i.test(this.toResolvableLocalUrl(path))
+      if (isContentUri) {
+        throw new Error('当前文件来源不支持，请从文件管理器选择本地文件')
+      }
+      if (!(Number(next.size || 0) > 0)) {
+        const meta = await this.readLocalFileMeta(next.filePath)
+        next = {
+          ...next,
+          name: next.name || meta.name || 'attachment',
+          size: Number(meta.size || next.size || 0)
+        }
+      }
+      return next
+    },
+    copyFileToPrivateDoc(sourcePath, sourceName = '') {
+      if (!this.isAppPlusRuntime()) return Promise.resolve(null)
+      const targetPath = this.toResolvableLocalUrl(sourcePath)
+      if (!targetPath) {
+        return Promise.reject(new Error('empty source path'))
+      }
+      if (/^content:\/\//i.test(targetPath)) {
+        return this.copyContentUriToPrivateDoc(targetPath, sourceName)
+      }
+      return new Promise((resolve, reject) => {
+        plus.io.resolveLocalFileSystemURL(
+          targetPath,
+          (entry) => {
+            plus.io.requestFileSystem(
+              plus.io.PRIVATE_DOC,
+              (fs) => {
+                fs.root.getDirectory(
+                  'consultation-upload',
+                  { create: true },
+                  (dirEntry) => {
+                    const targetName = this.buildSafeCopyName(sourceName || entry.name || 'attachment')
+                    entry.copyTo(
+                      dirEntry,
+                      targetName,
+                      (copiedEntry) => {
+                        const copiedPath = copiedEntry?.toLocalURL?.() || copiedEntry?.fullPath || ''
+                        copiedEntry.file(
+                          (copiedFile) => resolve({
+                            filePath: copiedPath,
+                            name: copiedFile?.name || targetName,
+                            size: Number(copiedFile?.size || 0)
+                          }),
+                          () => resolve({
+                            filePath: copiedPath,
+                            name: targetName,
+                            size: 0
+                          })
+                        )
+                      },
+                      (err) => reject(err)
+                    )
+                  },
+                  (err) => reject(err)
+                )
+              },
+              (err) => reject(err)
+            )
+          },
+          (err) => reject(err)
+        )
+      })
+    },
+    copyContentUriToPrivateDoc(contentUri, sourceName = '') {
+      if (!this.isAppPlusRuntime()) return Promise.resolve(null)
+      if (String(plus.os?.name || '').toLowerCase() !== 'android') {
+        return Promise.reject(new Error('content uri copy is android only'))
+      }
+      return new Promise((resolve, reject) => {
+        plus.io.requestFileSystem(
+          plus.io.PRIVATE_DOC,
+          (fs) => {
+            fs.root.getDirectory(
+              'consultation-upload',
+              { create: true },
+              async () => {
+                try {
+                  const meta = this.queryContentUriMeta(contentUri)
+                  const targetName = this.buildSafeCopyName(sourceName || meta.name || 'attachment')
+                  const relativePath = `_doc/consultation-upload/${targetName}`
+                  const absolutePath = plus.io.convertLocalFileSystemURL(relativePath)
+                  const copiedBytes = this.streamContentUriToFile(contentUri, absolutePath)
+                  const finalSize = copiedBytes > 0 ? copiedBytes : Number(meta.size || 0)
+                  resolve({
+                    filePath: relativePath,
+                    name: targetName,
+                    size: finalSize
+                  })
+                } catch (err) {
+                  reject(err)
+                }
+              },
+              (err) => reject(err)
+            )
+          },
+          (err) => reject(err)
+        )
+      })
+    },
+    invokeJavaMethod(target, methodName, ...args) {
+      if (!target || !methodName) return null
+      try {
+        const direct = target[methodName]
+        if (typeof direct === 'function') {
+          return direct.apply(target, args)
+        }
+      } catch (err) {
+        // Fallback to plus.android.invoke below.
+      }
+      if (this.isAppPlusRuntime() && plus.android && typeof plus.android.invoke === 'function') {
+        try {
+          return plus.android.invoke(target, methodName, ...args)
+        } catch (err) {
+          return null
+        }
+      }
+      return null
+    },
+    toJavaNumber(value, fallback = 0) {
+      const num = Number(value)
+      return Number.isFinite(num) ? num : fallback
+    },
+    queryContentUriMeta(contentUri) {
+      if (!this.isAppPlusRuntime()) return { name: '', size: 0 }
+      try {
+        const activity = plus.android.runtimeMainActivity()
+        if (!activity) return { name: '', size: 0 }
+        try { plus.android.importClass(activity) } catch (err) {}
+        const Uri = plus.android.importClass('android.net.Uri')
+        const OpenableColumns = plus.android.importClass('android.provider.OpenableColumns')
+        const resolver = this.invokeJavaMethod(activity, 'getContentResolver')
+        if (!resolver) return { name: '', size: 0 }
+        try { plus.android.importClass(resolver) } catch (err) {}
+        const uri = Uri.parse(contentUri)
+        const cursor = this.invokeJavaMethod(resolver, 'query', uri, null, null, null, null)
+        if (!cursor) return { name: '', size: 0 }
+        try { plus.android.importClass(cursor) } catch (err) {}
+        let name = ''
+        let size = 0
+        try {
+          if (this.invokeJavaMethod(cursor, 'moveToFirst')) {
+            const nameIdx = this.toJavaNumber(this.invokeJavaMethod(cursor, 'getColumnIndex', OpenableColumns.DISPLAY_NAME), -1)
+            const sizeIdx = this.toJavaNumber(this.invokeJavaMethod(cursor, 'getColumnIndex', OpenableColumns.SIZE), -1)
+            if (nameIdx >= 0) {
+              name = String(this.invokeJavaMethod(cursor, 'getString', nameIdx) || '')
+            }
+            if (sizeIdx >= 0) {
+              size = this.toJavaNumber(this.invokeJavaMethod(cursor, 'getLong', sizeIdx), 0)
+            }
+          }
+        } finally {
+          this.invokeJavaMethod(cursor, 'close')
+        }
+        return { name, size }
+      } catch (err) {
+        console.error('query content uri meta failed', err)
+        return { name: '', size: 0 }
+      }
+    },
+    streamContentUriToFile(contentUri, absolutePath) {
+      if (!this.isAppPlusRuntime()) return 0
+      const activity = plus.android.runtimeMainActivity()
+      if (!activity) throw new Error('missing activity')
+      try { plus.android.importClass(activity) } catch (err) {}
+      const Uri = plus.android.importClass('android.net.Uri')
+      const resolver = this.invokeJavaMethod(activity, 'getContentResolver')
+      if (!resolver) throw new Error('missing content resolver')
+      try { plus.android.importClass(resolver) } catch (err) {}
+      const uri = Uri.parse(contentUri)
+      const inputStream = this.invokeJavaMethod(resolver, 'openInputStream', uri)
+      if (!inputStream) {
+        throw new Error('open input stream failed')
+      }
+      try { plus.android.importClass(inputStream) } catch (err) {}
+      const outputStream = plus.android.newObject('java.io.FileOutputStream', absolutePath)
+      let copied = 0
+      try {
+        let value = this.toJavaNumber(this.invokeJavaMethod(inputStream, 'read'), -1)
+        while (value !== -1) {
+          this.invokeJavaMethod(outputStream, 'write', value)
+          copied += 1
+          value = this.toJavaNumber(this.invokeJavaMethod(inputStream, 'read'), -1)
+        }
+        this.invokeJavaMethod(outputStream, 'flush')
+      } finally {
+        this.closeJavaStream(outputStream)
+        this.closeJavaStream(inputStream)
+      }
+      return copied
+    },
+    closeJavaStream(stream) {
+      if (!stream) return
+      try {
+        this.invokeJavaMethod(stream, 'close')
+      } catch (err) {
+        console.error('close java stream failed', err)
+      }
+    },
+    readLocalFileMeta(path) {
+      if (!path || !this.isAppPlusRuntime() || typeof plus.io.resolveLocalFileSystemURL !== 'function') {
+        return Promise.resolve({ name: this.extractFileName(path), size: 0 })
+      }
+      return new Promise((resolve) => {
+        plus.io.resolveLocalFileSystemURL(
+          this.toResolvableLocalUrl(path),
+          (entry) => {
+            if (!entry || typeof entry.file !== 'function') {
+              resolve({ name: this.extractFileName(path), size: 0 })
+              return
+            }
+            entry.file(
+              (file) => resolve({
+                name: file?.name || this.extractFileName(path),
+                size: Number(file?.size || 0)
+              }),
+              () => resolve({ name: this.extractFileName(path), size: 0 })
+            )
+          },
+          () => resolve({ name: this.extractFileName(path), size: 0 })
+        )
+      })
+    },
+    async resolveAttachmentUploadPath(attachment) {
+      if (!attachment) return ''
+      let local = this.normalizeNativeFilePath(attachment.path)
+      if (!local) return ''
+      if (/^content:\/\//i.test(this.toResolvableLocalUrl(local))) {
+        throw new Error('当前文件来源不支持，请从文件管理器选择本地文件')
+      }
+      if (!/^https?:\/\//i.test(local)) {
+        if (
+          this.isAppPlusRuntime()
+          && typeof plus.io.convertLocalFileSystemURL === 'function'
+          && this.isAppPrivatePath(local)
+        ) {
+          local = plus.io.convertLocalFileSystemURL(local)
+        }
+        return local
+      }
+      return new Promise((resolve) => {
+        uni.downloadFile({
+          url: local,
+          success: (res) => resolve(res.tempFilePath || ''),
+          fail: () => resolve('')
+        })
+      })
+    },
+    isChooseCancelled(err) {
+      const message = String(this.pickErrorText(err) || '').toLowerCase()
+      return message.includes('cancel') || message.includes('取消')
+    },
+    pickErrorText(err) {
+      if (!err) return ''
+      const code = Number(err.code || err.statusCode || 0)
+      const rawMessage = String(err.message || err.error || err.errMsg || '')
+      if (code === 413 || /upload size exceeded|maximum upload size exceeded|文件过大/i.test(rawMessage)) {
+        return '文件过大，请压缩后重试或改为发送下载链接'
+      }
+      if (typeof err === 'string') return err
+      if (typeof err.errMsg === 'string' && err.errMsg) return err.errMsg
+      if (typeof err.error === 'string' && err.error) return err.error
+      if (typeof err.message === 'string' && err.message) return err.message
+      return ''
     },
     clearAttachment() {
       this.pendingAttachment = null
@@ -724,8 +1292,9 @@ export default {
         this.loading = true
         try {
           const data = await sendAgentMessageWithImage(text, file.path)
-          const reply = this.normalizeAgentReply(data)
+          const { content: reply, action } = this.resolveAgentPayload(data)
           this.replaceTyping(typingId, reply)
+          this.runAgentAction(action)
         } catch (err) {
           console.error('agent image chat error', err)
           this.replaceTyping(typingId, '抱歉，AI助手暂时无法响应，请稍后重试。')
@@ -747,12 +1316,14 @@ export default {
       this.loading = true
 
       try {
-        if (this.canStream()) {
+        const shouldUseStructured = this.shouldUseStructuredAgentRequest(text)
+        if (!shouldUseStructured && this.canStream()) {
           await this.streamFromModel(text, typingId)
         } else {
           const data = await sendAgentMessage(text)
-          const reply = this.normalizeAgentReply(data)
+          const { content: reply, action } = this.resolveAgentPayload(data)
           this.replaceTyping(typingId, reply)
+          this.runAgentAction(action)
         }
       } catch (err) {
         console.error('agent chat error', err)
@@ -766,8 +1337,13 @@ export default {
       this.loading = true
       try {
         if (attachment) {
-          const uploaded = await uploadConsultationAttachment(this.consultationId, attachment.path, {
-            messageType: attachment.type || 'FILE'
+          const uploadPath = await this.resolveAttachmentUploadPath(attachment)
+          if (!uploadPath) {
+            throw new Error('missing upload file path')
+          }
+          const uploaded = await uploadConsultationAttachment(this.consultationId, uploadPath, {
+            messageType: attachment.type || 'FILE',
+            fileName: attachment.name || this.extractFileName(uploadPath)
           })
           const uploadedMessage = this.mapConsultationMessage(uploaded)
           uploadedMessage.self = true
@@ -789,12 +1365,18 @@ export default {
         await this.pollConsultationMessages({ silent: true, forceScroll: true })
       } catch (err) {
         console.error('send consultation message failed', err)
+        uni.showToast({ title: this.pickErrorText(err) || '发送失败', icon: 'none' })
       } finally {
         this.loading = false
       }
     },
     canStream() {
       return typeof fetch === 'function' && typeof ReadableStream !== 'undefined'
+    },
+    shouldUseStructuredAgentRequest(text) {
+      const value = String(text || '').trim()
+      if (!value) return false
+      return /(患者|病历|数据|信息|资料|查询|检索|搜索|查看|跳转|进入|打开|前往|详情)/.test(value)
     },
     async streamFromModel(text, typingId) {
       const token = getToken()
@@ -838,6 +1420,41 @@ export default {
         }
       }
       this.replaceTyping(typingId, content)
+    },
+    resolveAgentPayload(payload) {
+      const content = this.normalizeAgentReply(payload)
+      const action = payload && typeof payload === 'object' && payload.action && typeof payload.action === 'object'
+        ? payload.action
+        : null
+      return { content, action }
+    },
+    runAgentAction(action) {
+      if (!action || typeof action !== 'object') return
+      const type = String(action.type || '').trim().toLowerCase()
+      if (!type) return
+
+      if (type === 'open_patient_detail') {
+        const patientId = Number(action.patientId || action.patient_id)
+        if (!patientId) return
+        const patientName = String(action.patientName || action.patient_name || '').trim()
+        uni.setStorageSync('currentPatient', patientName ? { id: patientId, name: patientName } : { id: patientId })
+        uni.showToast({ title: '正在打开患者详情', icon: 'none' })
+        setTimeout(() => {
+          uni.navigateTo({ url: `/pages/patient/detail?id=${patientId}` })
+        }, 80)
+        return
+      }
+
+      if (type === 'open_patient_list') {
+        const keyword = String(action.keyword || '').trim()
+        if (keyword) {
+          uni.setStorageSync(AGENT_PATIENT_SEARCH_KEY, keyword)
+        }
+        uni.showToast({ title: keyword ? `已筛选：${keyword}` : '已打开患者列表', icon: 'none' })
+        setTimeout(() => {
+          uni.switchTab({ url: '/pages/patient/list' })
+        }, 80)
+      }
     },
     normalizeAgentReply(payload) {
       if (typeof payload === 'string') return payload
@@ -1111,7 +1728,11 @@ export default {
       if (!path) return ''
       const normalized = String(path).replace(/\\/g, '/')
       const arr = normalized.split('/')
-      return arr[arr.length - 1] || ''
+      try {
+        return decodeURIComponent(arr[arr.length - 1] || '')
+      } catch (err) {
+        return arr[arr.length - 1] || ''
+      }
     },
     detectAttachmentType(nameOrPath) {
       const text = String(nameOrPath || '').toLowerCase()
@@ -1120,6 +1741,22 @@ export default {
       if (imageExt.some((ext) => text.endsWith(ext))) return 'IMAGE'
       if (modelExt.some((ext) => text.endsWith(ext))) return 'MODEL'
       return 'FILE'
+    },
+    async downloadAttachment(message) {
+      const url = String(message?.ossPath || '').trim()
+      if (!url) {
+        uni.showToast({ title: '附件地址无效', icon: 'none' })
+        return
+      }
+      const filename = String(message?.fileName || this.extractFileName(url) || 'attachment')
+      await downloadWithMobileSupport({
+        url,
+        filename,
+        loadingTitle: '下载中...',
+        successTitle: '下载成功',
+        failTitle: '下载失败',
+        autoOpen: false
+      })
     },
     openOssPath(url) {
       if (!url) return

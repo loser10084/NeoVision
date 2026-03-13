@@ -13,6 +13,7 @@ import config
 from api_gateway import llm
 from api_gateway import history
 from api_gateway import agent_runtime
+from api_gateway import patient_assistant
 
 from utils import logger
 
@@ -94,6 +95,18 @@ def agent_chat():
 
     if not query and not image_url:
         return jsonify({"error": "empty prompt"}), 400
+
+    if query and not image_url:
+        shortcut_reply = patient_assistant.handle_patient_assistant_command(
+            query=query,
+            auth_header=request.headers.get("Authorization", ""),
+        )
+        if shortcut_reply is not None:
+            content = str(shortcut_reply.get("content") or "").strip()
+            action = shortcut_reply.get("action")
+            if content:
+                history.append_exchange(user_id, query, content)
+            return jsonify({"content": content, "action": action})
 
     provided_messages = None
     if isinstance(payload, list):

@@ -217,6 +217,9 @@ export function uploadConsultationAttachment(consultationId, filePath, options =
     if (options.messageType) {
       formData.messageType = options.messageType
     }
+    if (options.fileName) {
+      formData.fileName = options.fileName
+    }
     uni.uploadFile({
       url: resolveApiUrl(`/api/patients/social/consultations/${consultationId}/attachments`),
       filePath,
@@ -229,12 +232,13 @@ export function uploadConsultationAttachment(consultationId, filePath, options =
           return
         }
         try {
-          const payload = JSON.parse(res.data)
-          if (payload?.code !== 0) {
+          const payload = typeof res.data === 'string' ? JSON.parse(res.data) : (res.data || {})
+          const hasCode = payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'code')
+          if (hasCode && Number(payload.code) !== 0) {
             reject(payload)
             return
           }
-          resolve(payload.data)
+          resolve(hasCode ? payload.data : payload)
         } catch (err) {
           reject(err)
         }

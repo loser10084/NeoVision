@@ -134,6 +134,8 @@
 <script>
 import { getPatients } from '../../common/api'
 
+const AGENT_PATIENT_SEARCH_KEY = 'agent_patient_search_keyword'
+
 export default {
   data() {
     return {
@@ -189,6 +191,7 @@ export default {
     this.fetchPatients()
   },
   onShow() {
+    this.applyAgentSearchKeyword()
     this.fetchPatients({ keyword: this.keyword, silent: true })
   },
   onPullDownRefresh() {
@@ -272,6 +275,12 @@ export default {
     clearSearch() {
       this.keyword = ''
       this.handleSearch()
+    },
+    applyAgentSearchKeyword() {
+      const keyword = String(uni.getStorageSync(AGENT_PATIENT_SEARCH_KEY) || '').trim()
+      if (!keyword) return
+      this.keyword = keyword
+      uni.removeStorageSync(AGENT_PATIENT_SEARCH_KEY)
     },
     goDetail(patient) {
       if (!patient || !patient.id) return
