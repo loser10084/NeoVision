@@ -47,7 +47,7 @@ class GraphExecutor:
             "consecutive_search_count": 0,
             "output": "",
             "next_agent": "router",
-            "sender": "general_agent"
+            "sender": "operation_assistant_agent"
         }
             
         # 执行图
@@ -102,7 +102,7 @@ class GraphExecutor:
             "consecutive_search_count": 0,
             "output": "",
             "next_agent": "router",
-            "sender": "general_agent"
+            "sender": "operation_assistant_agent"
         }
             
         # 创建队列用于收集token
@@ -279,7 +279,7 @@ def build_multimodal_agent_executor(user_id: str, query: str, image_url: str, st
         "consecutive_search_count": 0,
         "output": "",
         "next_agent": "router",  # 这将触发路由节点决定使用哪个智能体
-        "sender": "general_agent"
+        "sender": "operation_assistant_agent"
     }
     
     # 执行图
@@ -389,7 +389,7 @@ def stream_multimodal_agent_executor(user_id: str, query: str, image_url: str, s
     #     "consecutive_search_count": 0,
     #     "output": "",
     #     "next_agent": "router",  # 这将触发路由节点决定使用哪个智能体
-    #     "sender": "general_agent"
+    #     "sender": "operation_assistant_agent"
     # }
     
     # # 流式执行图

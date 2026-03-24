@@ -14,7 +14,7 @@
 
     <view class="context-strip">
       <text class="context-chip">{{ isConsultation ? '联合会诊' : 'AI问答' }}</text>
-      <text class="context-chip">{{ isConsultation ? `成员 ${members.length}` : '影像问答模式' }}</text>
+      <text class="context-chip">{{ isConsultation ? `成员 ${members.length}` : agentModeLabel }}</text>
       <text v-if="isConsultation && consultationId" class="context-chip">#{{ consultationId }}</text>
     </view>
 
@@ -290,6 +290,12 @@ export default {
       const current = new Set((this.members || []).map((m) => Number(m.doctorId)))
       return (this.friends || []).filter((friend) => !current.has(Number(friend.id)))
     },
+    agentModeLabel() {
+      return '\u8d28\u91cf\u8bc4\u4f30 / \u64cd\u4f5c\u8f85\u52a9 / \u5f71\u50cf\u5206\u6790 / \u4e34\u5e8a\u6307\u5357\u68c0\u7d22'
+    },
+    agentWelcomeMessage() {
+      return '\u4f60\u597d\uff0c\u6211\u662f\u591a\u667a\u80fd\u4f53AI\u52a9\u624b\uff0c\u5f53\u524d\u652f\u6301\u8d28\u91cf\u8bc4\u4f30\u3001\u64cd\u4f5c\u8f85\u52a9\u3001\u5f71\u50cf\u5206\u6790\u548c\u4e34\u5e8a\u6307\u5357\u68c0\u7d22\uff0c\u8bf7\u8f93\u5165\u4f60\u7684\u95ee\u9898\u3002'
+    },
     userInitial() {
       const name = String(this.userName || '').trim()
       if (!name) return '医'
@@ -330,7 +336,7 @@ export default {
       id: `welcome-${Date.now()}`,
       self: false,
       type: 'TEXT',
-      content: '你好，我是AI助手，请输入你的问题。',
+      content: this.agentWelcomeMessage,
       createdAt: ''
     })
     await this.loadAiHistory()
