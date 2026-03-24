@@ -1,71 +1,76 @@
-# OS / editor
+# OS / editors
 .DS_Store
 Thumbs.db
+Desktop.ini
 .idea/
 .vscode/
+*.iml
+*.ipr
+*.iws
+*.suo
+*.user
 *.swp
-
-# Env / secrets
-.env
-.env.*
-*.pem
-*.key
+*.tmp
 
 # Logs
 *.log
+logs/
+
+# Local env / secrets
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+env/
 
 # Python
 __pycache__/
 *.py[cod]
-.venv/
-venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
 
-# Node / frontend
+# Node / frontend build output
 node_modules/
 dist/
 build/
-.next/
-out/
 coverage/
+unpackage/
+.hbuilderx/
 
-# ML artifacts / data
-*.mha
-*.npy
-*.npz
+# Java / Maven
+target/
+out/
+.classpath
+.project
+.settings/
+
+# ML models / medical images / runtime data
 *.pt
 *.pth
+*.ckpt
 *.onnx
 *.h5
-*.ckpt
 *.pkl
-data/
-datasets/
-models/
-outputs/
+*.joblib
+*.mha
+*.nrrd
+*.nii
+*.nii.gz
+*.npy
+*.npz
+*.sqlite3
 runs/
+outputs/
+tmp/
 
-# Archives
-*.zip
-*.7z
-*.rar
-.git1/
-
-# Root docs / assets (keep code only)
-/3d�ο�.md
-/3Dʵ��.md
-/FrontendIntegrationNotes.txt
-/redis����.txt
-/report.md
-/����ʵ��.md
-/��Ŀ����.docx
-/��Ŀ����.txt
-/ǰ����ʾ��.md
-/�����ʾ��.md
-/api_endpoints.txt
-/sample_data.sql
-/schema.sql
-/wot-design-uni�����Դ.md
-/project_icon.jpg
-/brats_2013_pat0001_1_Flair.mha
-/brats_2013_pat0001_1_label.mha
-/neoVison.zip
+# Project-specific generated artifacts
+output/
+SmartImage_multimodel/data_storage/RAG/chroma_db/
+SmartImage_multimodel/data_storage/cpdm_outputs/
+SmartImage_multimodel/data_storage/ctv_outputs/
+SmartImage_multimodel/data_storage/teaching_outputs/
+SmartImage_multimodel/segmentation_model/models/
