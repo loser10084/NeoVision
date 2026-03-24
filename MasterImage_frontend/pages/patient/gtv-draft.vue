@@ -102,7 +102,7 @@
 
 <script>
 import { getStudiesByPatient, getModel, upsertContour } from '../../common/api'
-import { resolveApiUrl, resolveStudyResourceUrl } from '../../common/request'
+import { resolveApiUrl, resolveStudyResourceUrl, getToken } from '../../common/request'
 import { downloadWithMobileSupport } from '../../common/mobile-download'
 
 export default {
@@ -340,10 +340,10 @@ export default {
         return this.uploadSingleFetch(studyId, file)
       }
       const filePath = await this.resolveLocalPath(file)
-      if (!filePath) {
+      if (typeof filePath !== 'string' || !filePath.trim()) {
         throw new Error('Missing file path')
       }
-      const token = uni.getStorageSync('token') || ''
+      const token = getToken()
       return new Promise((resolve, reject) => {
         uni.uploadFile({
           url: resolveApiUrl(`/api/studies/${studyId}/segment`),
@@ -363,7 +363,14 @@ export default {
               reject(e)
             }
           },
-          fail: (err) => reject(err)
+          fail: (err) => {
+            console.error('upload single failed', {
+              studyId,
+              filePath,
+              err
+            })
+            reject(err)
+          }
         })
       })
     },
@@ -375,20 +382,22 @@ export default {
       const t1Path = await this.resolveLocalPath(files.t1)
       const t1cPath = await this.resolveLocalPath(files.t1c)
       const t2Path = await this.resolveLocalPath(files.t2)
-      if (!flairPath || !t1Path || !t1cPath || !t2Path) {
+      const allPaths = [flairPath, t1Path, t1cPath, t2Path]
+      if (allPaths.some((p) => typeof p !== 'string' || !p.trim())) {
         throw new Error('Missing local file')
       }
       const fileList = [
-        { name: 'flair', filePath: flairPath },
-        { name: 't1', filePath: t1Path },
-        { name: 't1c', filePath: t1cPath },
-        { name: 't2', filePath: t2Path }
+        { name: 'flair', uri: flairPath },
+        { name: 't1', uri: t1Path },
+        { name: 't1c', uri: t1cPath },
+        { name: 't2', uri: t2Path }
       ]
-      const token = uni.getStorageSync('token') || ''
+      const token = getToken()
       return new Promise((resolve, reject) => {
         uni.uploadFile({
           url: resolveApiUrl(`/api/studies/${studyId}/segment/multimodal`),
           files: fileList,
+          timeout: 600000,
           header: token ? { Authorization: `Bearer ${token}` } : {},
           success: (res) => {
             try {
@@ -402,7 +411,14 @@ export default {
               reject(e)
             }
           },
-          fail: (err) => reject(err)
+          fail: (err) => {
+            console.error('upload multimodal failed', {
+              studyId,
+              fileList,
+              err
+            })
+            reject(err)
+          }
         })
       })
     },
@@ -411,7 +427,7 @@ export default {
       if (!blob) throw new Error('Missing file data')
       const form = new FormData()
       form.append('file', blob, file.name || 'volume.nrrd')
-      const token = uni.getStorageSync('token') || ''
+      const token = getToken()
       const res = await fetch(resolveApiUrl(`/api/studies/${studyId}/segment`), {
         method: 'POST',
         body: form,
@@ -436,7 +452,7 @@ export default {
       form.append('t1', t1Blob, files.t1?.name || 't1.nrrd')
       form.append('t1c', t1cBlob, files.t1c?.name || 't1c.nrrd')
       form.append('t2', t2Blob, files.t2?.name || 't2.nrrd')
-      const token = uni.getStorageSync('token') || ''
+      const token = getToken()
       const res = await fetch(resolveApiUrl(`/api/studies/${studyId}/segment/multimodal`), {
         method: 'POST',
         body: form,
@@ -448,10 +464,44 @@ export default {
       }
       return payload.data
     },
+    extractPathValue(value, depth = 0) {
+      if (!value || depth > 5) return ''
+      if (typeof value === 'string') return value.trim()
+      if (Array.isArray(value)) {
+        for (let i = 0; i < value.length; i += 1) {
+          const next = this.extractPathValue(value[i], depth + 1)
+          if (next) return next
+        }
+        return ''
+      }
+      if (typeof value === 'object') {
+        const fields = [
+          'localPath',
+          'filePath',
+          'tempFilePath',
+          'path',
+          'url',
+          'downloadUrl',
+          'uri',
+          'savedFilePath',
+          'apFilePath'
+        ]
+        for (let i = 0; i < fields.length; i += 1) {
+          const next = this.extractPathValue(value[fields[i]], depth + 1)
+          if (next) return next
+        }
+      }
+      return ''
+    },
     async fetchBlob(file) {
       if (!file) return null
       if (file.fileObj) return file.fileObj
-      const target = file.filePath || file.localPath || ''
+      const target =
+        this.extractPathValue(file.filePath) ||
+        this.extractPathValue(file.localPath) ||
+        this.extractPathValue(file.path) ||
+        this.extractPathValue(file.url) ||
+        this.extractPathValue(file.downloadUrl)
       if (!target) return null
       const res = await fetch(target)
       if (!res.ok) return null
@@ -459,16 +509,78 @@ export default {
     },
     async resolveLocalPath(file) {
       if (!file) return ''
-      const local = file.localPath || ''
-      if (local && !/^https?:\/\//i.test(local)) return local
-      const remote = file.filePath || ''
-      if (!remote || !/^https?:\/\//i.test(remote)) return remote
+      const localCandidate =
+        this.extractPathValue(file.localPath) ||
+        this.extractPathValue(file.tempFilePath) ||
+        this.extractPathValue(file.path)
+      const normalizedLocal = this.toNativeUploadPath(localCandidate)
+      if (normalizedLocal && !/^https?:\/\//i.test(normalizedLocal)) {
+        const exists = await this.localPathExists(normalizedLocal)
+        if (exists) {
+          return normalizedLocal
+        }
+      }
+      const remote =
+        this.extractPathValue(file.filePath) ||
+        this.extractPathValue(file.url) ||
+        this.extractPathValue(file.downloadUrl) ||
+        normalizedLocal
+      if (!remote) return ''
+      if (!/^https?:\/\//i.test(remote)) {
+        const normalized = this.toNativeUploadPath(remote)
+        if (!normalized) return ''
+        const exists = await this.localPathExists(normalized)
+        return exists ? normalized : ''
+      }
       return new Promise((resolve) => {
         uni.downloadFile({
           url: remote,
-          success: (res) => resolve(res.tempFilePath),
+          success: (res) => {
+            if (res.statusCode < 200 || res.statusCode >= 300) {
+              resolve('')
+              return
+            }
+            resolve(this.toNativeUploadPath(res.tempFilePath || ''))
+          },
           fail: () => resolve('')
         })
+      })
+    },
+    isAppPlusRuntime() {
+      return typeof plus !== 'undefined' && !!plus.io
+    },
+    isAppPrivatePath(path) {
+      const value = String(path || '').toLowerCase()
+      return value.startsWith('_doc/') || value.startsWith('_documents/') || value.startsWith('_www/')
+    },
+    toResolvableLocalUrl(path) {
+      const value = String(path || '').trim()
+      if (!value) return ''
+      if (/^(file|content):\/\//i.test(value)) return value
+      if (value.startsWith('/')) return `file://${value}`
+      return value
+    },
+    toNativeUploadPath(path) {
+      let local = String(path || '').trim()
+      if (!local) return ''
+      if (!this.isAppPlusRuntime()) return local
+      if (typeof plus.io.convertLocalFileSystemURL === 'function' && this.isAppPrivatePath(local)) {
+        local = plus.io.convertLocalFileSystemURL(local)
+      }
+      return local
+    },
+    localPathExists(path) {
+      const target = String(path || '').trim()
+      if (!target || /^https?:\/\//i.test(target)) return Promise.resolve(false)
+      if (!this.isAppPlusRuntime() || typeof plus.io.resolveLocalFileSystemURL !== 'function') {
+        return Promise.resolve(!!target)
+      }
+      return new Promise((resolve) => {
+        plus.io.resolveLocalFileSystemURL(
+          this.toResolvableLocalUrl(target),
+          () => resolve(true),
+          () => resolve(false)
+        )
       })
     }
   }

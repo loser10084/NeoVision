@@ -321,7 +321,7 @@ export default {
         uni.showToast({ title: '分割完成', icon: 'success' })
       } catch (err) {
         console.error('submit expand error', err)
-        uni.showToast({ title: '模型端未就绪', icon: 'none' })
+        uni.showToast({ title: this.resolveErrorMessage(err, '\u8bf7\u6c42\u5931\u8d25'), icon: 'none' })
       } finally {
         this.processing = false
         uni.hideLoading()
@@ -338,14 +338,15 @@ export default {
       const t1Path = await this.resolveLocalPath(files.t1)
       const t1cPath = await this.resolveLocalPath(files.t1c)
       const t2Path = await this.resolveLocalPath(files.t2)
-      if (!flairPath || !t1Path || !t1cPath || !t2Path) {
+      const allPaths = [flairPath, t1Path, t1cPath, t2Path]
+      if (allPaths.some((p) => typeof p !== 'string' || !p.trim())) {
         throw new Error('Missing local file')
       }
       const fileList = [
-        { name: 'flair', filePath: flairPath },
-        { name: 't1', filePath: t1Path },
-        { name: 't1c', filePath: t1cPath },
-        { name: 't2', filePath: t2Path }
+        { name: 'flair', uri: flairPath },
+        { name: 't1', uri: t1Path },
+        { name: 't1c', uri: t1cPath },
+        { name: 't2', uri: t2Path }
       ]
       const token = getToken()
       return new Promise((resolve, reject) => {
@@ -353,10 +354,15 @@ export default {
           url: resolveModelUrl(endpoint),
           files: fileList,
           formData: this.buildStorageFormData(),
+          timeout: 600000,
           header: token ? { Authorization: `Bearer ${token}` } : {},
           success: (res) => {
             try {
               const payload = typeof res.data === 'string' ? JSON.parse(res.data) : res.data
+              if (res.statusCode < 200 || res.statusCode >= 300) {
+                reject(payload || new Error(`HTTP ${res.statusCode || 'unknown'}`))
+                return
+              }
               if (payload?.error) {
                 reject(payload)
                 return
@@ -366,7 +372,10 @@ export default {
               reject(e)
             }
           },
-          fail: (err) => reject(err)
+          fail: (err) => {
+            console.error('ctv expand upload failed', { endpoint, fileList, err })
+            reject(err)
+          }
         })
       })
     },
@@ -401,7 +410,12 @@ export default {
     async fetchBlob(file) {
       if (!file) return null
       if (file.fileObj) return file.fileObj
-      const target = file.filePath || file.localPath || ''
+      const target =
+        this.extractPathValue(file.filePath) ||
+        this.extractPathValue(file.localPath) ||
+        this.extractPathValue(file.path) ||
+        this.extractPathValue(file.url) ||
+        this.extractPathValue(file.downloadUrl)
       if (!target) return null
       const res = await fetch(target)
       if (!res.ok) return null
@@ -409,17 +423,127 @@ export default {
     },
     async resolveLocalPath(file) {
       if (!file) return ''
-      const local = file.localPath || ''
-      if (local && !/^https?:\/\//i.test(local)) return local
-      const remote = file.filePath || ''
-      if (!remote || !/^https?:\/\//i.test(remote)) return remote
+      const localCandidate =
+        this.extractPathValue(file.localPath) ||
+        this.extractPathValue(file.tempFilePath) ||
+        this.extractPathValue(file.path)
+      const normalizedLocal = this.toNativeUploadPath(localCandidate)
+      if (normalizedLocal && !/^https?:\/\//i.test(normalizedLocal)) {
+        const exists = await this.localPathExists(normalizedLocal)
+        if (exists) return normalizedLocal
+      }
+      const remote =
+        this.extractPathValue(file.filePath) ||
+        this.extractPathValue(file.url) ||
+        this.extractPathValue(file.downloadUrl) ||
+        normalizedLocal
+      if (!remote) return ''
+      if (!/^https?:\/\//i.test(remote)) {
+        const normalized = this.toNativeUploadPath(remote)
+        if (!normalized) return ''
+        const exists = await this.localPathExists(normalized)
+        return exists ? normalized : ''
+      }
       return new Promise((resolve) => {
         uni.downloadFile({
           url: remote,
-          success: (res) => resolve(res.tempFilePath),
+          success: (res) => {
+            if (res.statusCode < 200 || res.statusCode >= 300) {
+              resolve('')
+              return
+            }
+            resolve(this.toNativeUploadPath(res.tempFilePath || ''))
+          },
           fail: () => resolve('')
         })
       })
+    },
+    extractPathValue(value, depth = 0) {
+      if (!value || depth > 5) return ''
+      if (typeof value === 'string') return value.trim()
+      if (Array.isArray(value)) {
+        for (let i = 0; i < value.length; i += 1) {
+          const next = this.extractPathValue(value[i], depth + 1)
+          if (next) return next
+        }
+        return ''
+      }
+      if (typeof value === 'object') {
+        const fields = [
+          'localPath',
+          'filePath',
+          'tempFilePath',
+          'path',
+          'url',
+          'downloadUrl',
+          'uri',
+          'savedFilePath',
+          'apFilePath'
+        ]
+        for (let i = 0; i < fields.length; i += 1) {
+          const next = this.extractPathValue(value[fields[i]], depth + 1)
+          if (next) return next
+        }
+      }
+      return ''
+    },
+    isAppPlusRuntime() {
+      return typeof plus !== 'undefined' && !!plus.io
+    },
+    isAppPrivatePath(path) {
+      const value = String(path || '').toLowerCase()
+      return value.startsWith('_doc/') || value.startsWith('_documents/') || value.startsWith('_www/')
+    },
+    toResolvableLocalUrl(path) {
+      const value = String(path || '').trim()
+      if (!value) return ''
+      if (/^(file|content):\/\//i.test(value)) return value
+      if (value.startsWith('/')) return `file://${value}`
+      return value
+    },
+    toNativeUploadPath(path) {
+      let local = this.normalizeNativeFilePath(path)
+      if (!local) return ''
+      if (!this.isAppPlusRuntime()) return local
+      if (typeof plus.io.convertLocalFileSystemURL === 'function' && this.isAppPrivatePath(local)) {
+        local = plus.io.convertLocalFileSystemURL(local)
+      }
+      return local
+    },
+    normalizeNativeFilePath(path) {
+      const raw = String(path || '').trim()
+      if (!raw) return ''
+      if (/^file:\/\//i.test(raw)) {
+        const pure = raw.replace(/^file:\/\//i, '')
+        try {
+          return decodeURIComponent(pure)
+        } catch (err) {
+          return pure
+        }
+      }
+      return raw
+    },
+    localPathExists(path) {
+      const target = String(path || '').trim()
+      if (!target || /^https?:\/\//i.test(target)) return Promise.resolve(false)
+      if (!this.isAppPlusRuntime() || typeof plus.io.resolveLocalFileSystemURL !== 'function') {
+        return Promise.resolve(!!target)
+      }
+      return new Promise((resolve) => {
+        plus.io.resolveLocalFileSystemURL(
+          this.toResolvableLocalUrl(target),
+          () => resolve(true),
+          () => resolve(false)
+        )
+      })
+    },
+    resolveErrorMessage(err, fallback = '\u8bf7\u6c42\u5931\u8d25') {
+      if (!err) return fallback
+      if (typeof err === 'string' && err.trim()) return err.trim()
+      if (typeof err?.error === 'string' && err.error.trim()) return err.error.trim()
+      if (typeof err?.message === 'string' && err.message.trim()) return err.message.trim()
+      if (typeof err?.errMsg === 'string' && err.errMsg.trim()) return err.errMsg.trim()
+      return fallback
     },
     buildStorageFormData() {
       const formData = {}

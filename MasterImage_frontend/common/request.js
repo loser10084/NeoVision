@@ -1,5 +1,11 @@
 const AUTH_WHITE_LIST = ['/api/auth/login', '/api/auth/register']
 const RUNTIME_SERVICE_URLS_KEY = 'runtime_service_urls'
+const TOKEN_STORAGE_KEY = 'token'
+const USER_PROFILE_STORAGE_KEY = 'userProfile'
+const AUTH_META_STORAGE_KEY = 'auth_meta'
+const TOKEN_IDLE_TIMEOUT_MS = 2 * 60 * 60 * 1000
+const TOKEN_ACTIVITY_TOUCH_INTERVAL_MS = 30 * 1000
+let lastAuthTouchAt = 0
 
 const FALLBACK_GATEWAY_URL = 'http://192.168.1.100:8080'
 const FALLBACK_MODEL_URL = 'http://192.168.1.100:5001'
@@ -128,22 +134,92 @@ export function resolveStudyResourceUrl(path = '') {
 export const BASE_URL = resolveServiceBase('gateway')
 export const MODEL_BASE_URL = resolveServiceBase('model')
 
-export function getToken() {
-  return uni.getStorageSync('token') || ''
+function toValidTimestamp(value) {
+  const num = Number(value)
+  return Number.isFinite(num) && num > 0 ? num : 0
+}
+
+function readAuthMeta() {
+  try {
+    const raw = uni.getStorageSync(AUTH_META_STORAGE_KEY)
+    if (!raw || typeof raw !== 'object') return {}
+    return raw
+  } catch (err) {
+    return {}
+  }
+}
+
+function writeAuthMeta(payload = {}) {
+  const issuedAt = toValidTimestamp(payload.issuedAt) || Date.now()
+  const lastActiveAt = toValidTimestamp(payload.lastActiveAt) || issuedAt
+  const next = {
+    issuedAt,
+    lastActiveAt,
+    idleTimeoutMs: TOKEN_IDLE_TIMEOUT_MS
+  }
+  uni.setStorageSync(AUTH_META_STORAGE_KEY, next)
+  lastAuthTouchAt = lastActiveAt
+  return next
+}
+
+function isAuthExpired(now = Date.now(), meta = readAuthMeta()) {
+  const lastActiveAt = toValidTimestamp(meta.lastActiveAt) || toValidTimestamp(meta.issuedAt)
+  if (!lastActiveAt) return false
+  return now - lastActiveAt >= TOKEN_IDLE_TIMEOUT_MS
+}
+
+export function getToken(options = {}) {
+  const { touch = true } = options || {}
+  const token = uni.getStorageSync(TOKEN_STORAGE_KEY) || ''
+  if (!token) return ''
+
+  const now = Date.now()
+  const meta = readAuthMeta()
+  if (isAuthExpired(now, meta)) {
+    clearAuth()
+    return ''
+  }
+
+  if (!touch) return token
+
+  const issuedAt = toValidTimestamp(meta.issuedAt)
+  const lastActiveAt = toValidTimestamp(meta.lastActiveAt)
+  if (!issuedAt || !lastActiveAt) {
+    writeAuthMeta({
+      issuedAt: issuedAt || now,
+      lastActiveAt: now
+    })
+    return token
+  }
+
+  if (now - Math.max(lastAuthTouchAt || 0, lastActiveAt) >= TOKEN_ACTIVITY_TOUCH_INTERVAL_MS) {
+    writeAuthMeta({
+      issuedAt,
+      lastActiveAt: now
+    })
+  }
+  return token
 }
 
 export function setAuth(token, user) {
   if (token) {
-    uni.setStorageSync('token', token)
+    uni.setStorageSync(TOKEN_STORAGE_KEY, token)
+    const now = Date.now()
+    writeAuthMeta({
+      issuedAt: now,
+      lastActiveAt: now
+    })
   }
   if (user) {
-    uni.setStorageSync('userProfile', user)
+    uni.setStorageSync(USER_PROFILE_STORAGE_KEY, user)
   }
 }
 
 export function clearAuth() {
-  uni.removeStorageSync('token')
-  uni.removeStorageSync('userProfile')
+  uni.removeStorageSync(TOKEN_STORAGE_KEY)
+  uni.removeStorageSync(USER_PROFILE_STORAGE_KEY)
+  uni.removeStorageSync(AUTH_META_STORAGE_KEY)
+  lastAuthTouchAt = 0
 }
 
 function isAuthWhiteUrl(url = '') {

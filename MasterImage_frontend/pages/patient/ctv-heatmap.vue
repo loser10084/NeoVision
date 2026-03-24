@@ -221,7 +221,7 @@ export default {
     }
     this.isH5 = typeof window !== 'undefined' && typeof document !== 'undefined'
     if (!this.patientId) {
-      uni.showToast({ title: '缂哄皯鎮ｈ€匢D', icon: 'none' })
+      uni.showToast({ title: '缺少患者ID', icon: 'none' })
       return
     }
     this.loadStudyFilesFromStorage()
@@ -489,12 +489,12 @@ export default {
 
       const selected = this.cpdmSelectedFile
       if (!selected) {
-        uni.showToast({ title: '褰撳墠搴忓垪鏆傛棤鍙敤杈撳叆鏂囦欢', icon: 'none' })
+        uni.showToast({ title: '当前序列暂无可用输入文件', icon: 'none' })
         return
       }
 
       this.cpdmSubmitting = true
-      uni.showLoading({ title: '鎻愪氦涓?..', mask: true })
+      uni.showLoading({ title: '提交中...', mask: true })
       try {
         const file = await this.prepareCpdmUploadFile(selected)
         const payload = await this.uploadCpdmFile(file)

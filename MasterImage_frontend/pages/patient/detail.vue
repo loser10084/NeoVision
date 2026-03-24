@@ -137,7 +137,7 @@ import {
   deletePatient,
   deleteStudy
 } from '../../common/api'
-import { resolveApiUrl } from '../../common/request'
+import { resolveApiUrl, getToken } from '../../common/request'
 
 export default {
   data() {
@@ -177,18 +177,18 @@ export default {
       return this.hasGtvLabel ? 'success' : 'primary'
     },
     ctvStatusText() {
-      if (this.hasCtvExpandLabel) return '\u5df2\u751f\u6210'
+      if (this.hasCtvRefineLabel || this.hasCtvContour) return '\u5df2\u751f\u6210'
       return '\u672a\u751f\u6210'
     },
     ctvStatusType() {
       if (this.ctv.status === '\u5df2\u786e\u8ba4') return 'success'
-      return this.hasCtvExpandLabel ? 'success' : 'warning'
+      return (this.hasCtvRefineLabel || this.hasCtvContour) ? 'success' : 'warning'
     },
     gtvLabel() {
       return this.gtv.storagePath || '生成后可查看/下载'
     },
     ctvLabel() {
-      if (this.hasCtvExpandLabel) return '\u5df2\u751f\u6210\u7cbe\u4fee Label'
+      if (this.hasCtvRefineLabel || this.hasCtvContour) return '\u5df2\u751f\u6210\u7cbe\u4fee Label'
       return '\u7b49\u5f85\u533b\u751f\u7cbe\u4fee'
     },
     ctvExpandLabel() {
@@ -207,14 +207,10 @@ export default {
       return '等待外扩'
     },
     ctvExpandStatusText() {
-      const studyId = this.primaryStudyId
-      const hasExpand = !!(studyId && this.ctvRefineLabelMap?.[studyId])
-      return hasExpand ? '\u5df2\u5916\u6269' : '\u672a\u5916\u6269'
+      return this.hasCtvExpandLabel ? '\u5df2\u5916\u6269' : '\u672a\u5916\u6269'
     },
     ctvExpandStatusType() {
-      const studyId = this.primaryStudyId
-      const hasExpand = !!(studyId && this.ctvRefineLabelMap?.[studyId])
-      return hasExpand ? 'success' : 'warning'
+      return this.hasCtvExpandLabel ? 'success' : 'warning'
     },
     heatmapLabel() {
       return this.ctv.confidenceMap || this.gtv.confidenceMap || '\u7f6e\u4fe1\u5ea6\u8303\u56f4'
@@ -228,11 +224,20 @@ export default {
     },
     hasCtvRefineLabel() {
       const studyId = this.primaryStudyId
-      return !!(studyId && this.ctvRefineLabelMap?.[studyId])
+      const current = studyId ? this.ctvRefineLabelMap?.[studyId] : null
+      if (current && (current.filePath || current.localPath || current.name)) return true
+      return Object.values(this.ctvRefineLabelMap || {}).some((item) => !!(item && (item.filePath || item.localPath || item.name)))
     },
     hasCtvExpandLabel() {
       const studyId = this.primaryStudyId
-      return !!(studyId && this.ctvExpandLabelMap?.[studyId])
+      const current = studyId ? this.ctvExpandLabelMap?.[studyId] : null
+      if (current && (current.filePath || current.localPath || current.name)) return true
+      return Object.values(this.ctvExpandLabelMap || {}).some((item) => !!(item && (item.filePath || item.localPath || item.name)))
+    },
+    hasCtvContour() {
+      if (!this.ctv || !this.ctv.storagePath) return false
+      const studyId = this.primaryStudyId
+      return !studyId || !this.ctv.studyId || this.ctv.studyId === studyId
     },
     isConfirmed() {
       return this.patient.status === '\u5df2\u786e\u8ba4' || this.patient.confirmed === true
@@ -1204,7 +1209,7 @@ export default {
       return `${role}.${ext}`
     },
     async uploadToBackend(studyId, file, role) {
-      const token = uni.getStorageSync('token') || ''
+      const token = getToken()
       const fileType = this.buildFileType(role, file?.name)
       const uploadPath = await this.resolveUploadPath(file)
       if (!uploadPath) {
