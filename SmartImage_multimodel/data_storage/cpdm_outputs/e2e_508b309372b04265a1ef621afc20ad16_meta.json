@@ -1,9 +1,0 @@
-{
-  "jobId": "508b309372b04265a1ef621afc20ad16",
-  "sampleStep": 200,
-  "createdAt": 1772986770.2277536,
-  "inputFile": "e2e_ct_input.npy",
-  "resultNpy": "pet.npy",
-  "resultPng": "pet.png",
-  "attentionNpy": "attention.npy"
-}

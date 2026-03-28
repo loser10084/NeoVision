@@ -1,5 +1,5 @@
-﻿server:
-  port: 8082
+server:
+  port: ${AUTH_SERVICE_PORT:8082}
 
 spring:
   application:
@@ -8,20 +8,21 @@ spring:
     allow-circular-references: true
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/smart_image?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true
-    username: root
-    password: 12345
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:smart_image}?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:change_me}
   data:
     redis:
-      host: localhost
-      port: 6379
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
   cloud:
     inetutils:
-      preferred-ip-address: 127.0.0.1
+      preferred-ip-address: ${SERVICE_BIND_IP:127.0.0.1}
     nacos:
       discovery:
-        server-addr: localhost:8848
-        ip: 127.0.0.1
+        server-addr: ${NACOS_SERVER_ADDR:localhost:8848}
+        ip: ${SERVICE_BIND_IP:127.0.0.1}
 
 mybatis:
   mapper-locations: classpath:mapper/*.xml

@@ -40,6 +40,11 @@ build/
 coverage/
 unpackage/
 .hbuilderx/
+*.apk
+*.aab
+*.wgt
+*.keystore
+*.jks
 
 # Java / Maven
 target/
@@ -69,8 +74,14 @@ tmp/
 
 # Project-specific generated artifacts
 output/
+MasterImage_frontend/unpackage/
+SmartImage_backend/**/target/
+SmartImage_backend/target/
 SmartImage_multimodel/data_storage/RAG/chroma_db/
 SmartImage_multimodel/data_storage/cpdm_outputs/
 SmartImage_multimodel/data_storage/ctv_outputs/
 SmartImage_multimodel/data_storage/teaching_outputs/
+SmartImage_multimodel/data_storage/**/__pycache__/
 SmartImage_multimodel/segmentation_model/models/
+SmartImage_multimodel/segmentation_model/**/__pycache__/
+SmartImage_multimodel/cpdm_model/**/__pycache__/

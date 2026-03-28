@@ -1,66 +1,55 @@
-﻿# =========================
+# =========================
 # Python >=3.10
 # =========================
 
-# 鍩虹搴?pandas>=1.0.0
-python-frontmatter>=0.4.0
-PyYAML>=5.3.1  # 閬垮厤 chromadb/langchain 渚濊禆鍐茬獊
+# Core scientific stack
 numpy>=1.23.0
-pynrrd>=1.0.0
-torch>=2.0.0
 scipy>=1.9.0
+pandas>=1.5.0
 matplotlib>=3.7.0
 pillow>=9.0.0
+torch>=2.0.0
+torchvision>=0.15.0
+SimpleITK>=2.3.0
+pynrrd>=1.0.0
 
-# Web 妗嗘灦
+# Web service
 flask==3.0.3
 python-dotenv==1.0.1
 requests>=2.31.0
 
-# =========================
-# LangChain 鐢熸€佺郴缁燂紙鏃х増鏈級
-# =========================
+# Data loading / parsing
+python-frontmatter>=0.4.0
+PyYAML>=5.3.1
+
+# LangChain ecosystem
 langchain==0.2.16
 langchain-core==0.2.38
 langchain-openai==0.1.22
 langchain-chroma>=0.1.0
+langchain-text-splitters>=0.2.2
 
-# =========================
-# 鍚戦噺搴?/ 鏁版嵁搴?/ 缂撳瓨
-# =========================
+# Vector store / cache
 chromadb>=0.5.0
-redis>= 5.2.1   # 娉ㄦ剰锛歭anggraph-checkpoint-redis 瑕佹眰 Redis 5.2.1 鎴栨洿楂樼増鏈?
+redis>=5.2.1
 
-# =========================
-# LangGraph 妗嗘灦锛堝鏋滈渶瑕侊級
-# =========================
+# LangGraph
 langgraph==0.1.10
 langgraph-checkpoint-redis==0.3.3
 
-# =========================
-# Token / Embedding / Async
-# =========================
+# Token / async utilities
 tiktoken>=0.7.0
 aiohttp>=3.8.0
 posthog<=3.1.0
-# =========================
-# 鏁版嵁楠岃瘉
-# =========================
-pydantic>=2.0
 
-# =========================
-#
-# =========================
+# Validation / logging
+pydantic>=2.0
 loguru==0.7.2
 psutil>=5.9.0
 
-# =========================
-# CPDM Inference
-# =========================
+# CPDM inference
 omegaconf>=2.3.0
 einops>=0.6.0
 pytorch-lightning>=1.9.0,<2.1.0
 segmentation-models-pytorch>=0.3.3,<0.4.0
-torchvision>=0.15.0
 tensorboard>=2.14.0
-
