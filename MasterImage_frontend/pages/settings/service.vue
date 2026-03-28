@@ -55,8 +55,8 @@ import {
   clearRuntimeServiceUrls
 } from '../../common/request'
 
-const DEFAULT_GATEWAY_URL = 'http://192.168.1.100:8080'
-const DEFAULT_MODEL_URL = 'http://192.168.1.100:5001'
+const DEFAULT_GATEWAY_URL = 'http://127.0.0.1:8080'
+const DEFAULT_MODEL_URL = 'http://127.0.0.1:5001'
 const LOCAL_GATEWAY_URL = 'http://127.0.0.1:8080'
 const LOCAL_MODEL_URL = 'http://127.0.0.1:5001'
 

@@ -7,8 +7,8 @@ const TOKEN_IDLE_TIMEOUT_MS = 2 * 60 * 60 * 1000
 const TOKEN_ACTIVITY_TOUCH_INTERVAL_MS = 30 * 1000
 let lastAuthTouchAt = 0
 
-const FALLBACK_GATEWAY_URL = 'http://192.168.1.100:8080'
-const FALLBACK_MODEL_URL = 'http://192.168.1.100:5001'
+const FALLBACK_GATEWAY_URL = 'http://127.0.0.1:8080'
+const FALLBACK_MODEL_URL = 'http://127.0.0.1:5001'
 
 function normalizeBaseUrl(value) {
   if (!value) return ''
